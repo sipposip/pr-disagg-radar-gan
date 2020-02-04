@@ -1,0 +1,12 @@
+smhi:
+http://opendata-download-radar.smhi.se/explore/
+zb https://opendata-download-radar.smhi.se/api/version/latest/area/sweden/product/comp/2014/1/10.zip?format=tif
+simply change date to get other data.
+size: 17mb per day (5 min data)
+available from 1 January 2009 onwards --> 11 yeras --> 66GB
+
+
+
+
+size in ram: 114mb per day --> ~2600 samples should fit on 300GB RAM (including the zones outside the radar, so when breaking it down
+only to usable data, it will be less data, so more will fit in).
