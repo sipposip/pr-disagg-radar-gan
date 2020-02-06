@@ -62,6 +62,9 @@ reshaped = agg.reshape((ndays,t_per_day,ny,nx))
 
 final = reshaped
 
+# convert to 32bit
+final = final.astype('float32')
+
 np.save(f'{outpath}/{startdate}-{enddate}_tres{tres}.np',final)
 
 
