@@ -165,7 +165,6 @@ def generate_fake_samples(n_batch):
     # generate points in latent space
     latent, cond = generate_latent_points( n_batch)
     # predict outputs
-    # images = generator.predict([cond_in, latent_in])
     generated = gen.predict([latent, cond])
     return [generated, cond]
 
@@ -197,25 +196,25 @@ def create_discriminator():
     in_sample = tf.keras.layers.Input(shape=(nhours,ndomain,ndomain,1))
 
     in_combined = tf.keras.layers.Concatenate(axis=-1)([in_sample,cond_expanded])
-    kernel_size = (4,3,3)
+    kernel_size = (3,3,3)
     main_net = tf.keras.Sequential([
     
-        tf.keras.layers.Conv3D(32, kernel_size=kernel_size, strides=2, input_shape=(nhours,ndomain,ndomain,2),
+        tf.keras.layers.Conv3D(64, kernel_size=kernel_size, strides=2, input_shape=(nhours,ndomain,ndomain,2),
                                padding="valid"), # 11x7x7x32
         tf.keras.layers.LeakyReLU(alpha=0.2),
         tf.keras.layers.Dropout(0.25),
 
-        tf.keras.layers.Conv3D(64, kernel_size=kernel_size, strides=1, padding="valid"),
+        tf.keras.layers.Conv3D(128, kernel_size=kernel_size, strides=2, padding="same"),
         tf.keras.layers.LeakyReLU(alpha=0.2),
         tf.keras.layers.Dropout(0.25),
         tf.keras.layers.BatchNormalization(momentum=0.8),
 
-        tf.keras.layers.Conv3D(128, kernel_size=kernel_size, strides=1, padding="valid"),
+        tf.keras.layers.Conv3D(256, kernel_size=kernel_size, strides=2, padding="same"),
         tf.keras.layers.LeakyReLU(alpha=0.2),
         tf.keras.layers.Dropout(0.25),
         tf.keras.layers.BatchNormalization(momentum=0.8),
 
-        tf.keras.layers.Conv3D(256, kernel_size=kernel_size, strides=1, padding="same"),
+        tf.keras.layers.Conv3D(256, kernel_size=kernel_size, strides=2, padding="same"),
         tf.keras.layers.LeakyReLU(alpha=0.2),
         tf.keras.layers.Dropout(0.25),
 
@@ -244,7 +243,7 @@ def create_generator():
     init = tf.keras.initializers.RandomNormal(stddev=0.02)
     # define model
 
-    n_nodes = 128 * 4 * 4 * 6
+    n_nodes = 256 * 2 * 2 * 3
     in_latent = tf.keras.layers.Input(shape=(latent_dim,))
     in_cond = tf.keras.layers.Input(shape=(ndomain,ndomain,n_channel))
     in_cond_flat = tf.keras.layers.Flatten()(in_cond)
@@ -253,17 +252,24 @@ def create_generator():
     main_net = tf.keras.Sequential([
         tf.keras.layers.Dense(n_nodes, kernel_initializer=init),
         tf.keras.layers.LeakyReLU(alpha=0.2),
-        tf.keras.layers.Reshape((6, 4,4,128)),
-        # upsample to 12x8x8x128
-        tf.keras.layers.Conv3DTranspose(128, (4, 4, 4), strides=(2, 2,2), padding='same', kernel_initializer=init),
-        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.Reshape((3, 2,2,256)),
+
+        tf.keras.layers.UpSampling3D(size=(2, 2, 2)),
+        tf.keras.layers.Conv3D(256,(3,3,3), padding='same', kernel_initializer=init),
+        tf.keras.layers.BatchNormalization(momentum=0.8),
         tf.keras.layers.LeakyReLU(alpha=0.2),
-        # upsample to 24x16x16x128
-        tf.keras.layers.Conv3DTranspose(128, (4, 4, 4), strides=(2, 2, 2), padding='same', kernel_initializer=init),
-        tf.keras.layers.BatchNormalization(),
+
+        tf.keras.layers.UpSampling3D(size=(2, 2, 2)),
+        tf.keras.layers.Conv3D(128, (3, 3, 3), padding='same', kernel_initializer=init),
+        tf.keras.layers.BatchNormalization(momentum=0.8),
+        tf.keras.layers.LeakyReLU(alpha=0.2),
+
+        tf.keras.layers.UpSampling3D(size=(2, 2, 2)),
+        tf.keras.layers.Conv3D(64, (3, 3, 3), padding='same', kernel_initializer=init),
+        tf.keras.layers.BatchNormalization(momentum=0.8),
         tf.keras.layers.LeakyReLU(alpha=0.2),
         # output 24x16x16x1
-        tf.keras.layers.Conv3D(1, (7, 7, 9), activation='linear', padding='same', kernel_initializer=init),
+        tf.keras.layers.Conv3D(1, (3, 3, 3), activation='linear', padding='same', kernel_initializer=init),
         tf.keras.layers.Activation(lambda x:tf.keras.activations.softmax(x,axis=1)), # softmax per gridpoint, thus over nhours
         #tf.keras.layers.Activation('tanh'),
         # check for Nans (only for debugging)
@@ -321,7 +327,7 @@ plt.savefig('real_samples.svg')
 print('start training')
 # train the generator and discriminator
 n_epochs=1000
-batch_size=128
+batch_size=32
 clip_value=0.01
 n_disc = 5
 bat_per_epo = int(n_samples/ batch_size)
