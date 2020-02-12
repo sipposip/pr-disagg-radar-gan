@@ -387,7 +387,6 @@ for i in trange(n_epochs):
             # plot generated examples
             plt.figure(figsize=(25, 10))
             n_plot = 10
-            [X_real, cond_real] = generate_fake_samples(n_plot)
             for iplot in range(n_plot):
                 plt.subplot(n_plot, 25, iplot * 25 + 1)
                 plt.imshow(cond_fake[iplot, :, :].squeeze(), cmap=plt.cm.gist_earth_r, norm=LogNorm(vmin=0.01, vmax=1))
