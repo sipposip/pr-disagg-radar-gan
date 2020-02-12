@@ -1,7 +1,11 @@
-#! /climstorage/sebastian/anaconda3/envs/pr-disagg-env/bin/python]
-# /pfs/nobackup/home/s/sebsc/miniconda3/envs/pr-disagg-env/bin/ipython
-"""
+#! /pfs/nobackup/home/s/sebsc/miniconda3/envs/pr-disagg-env/bin/python
 
+
+#SBATCH -A SNIC2019-3-611
+#SBATCH --time=24:00:00
+#SBATCH --gres=gpu:v100:1
+"""
+on misu160: #! /climstorage/sebastian/anaconda3/envs/pr-disagg-env/bin/python
 
 """
 import pickle
@@ -9,6 +13,8 @@ import os
 import numpy as np
 import tensorflow as tf
 import pandas as pd
+import matplotlib
+matplotlib.use('agg')
 from pylab import plt
 from tqdm import trange
 from skimage.util import view_as_windows
@@ -29,9 +35,10 @@ tp_thresh_daily = 5 # mm. in the radardate the unit is mm/h, but then on 5 minut
                     # the conversion is done automatically in this script
 n_thresh = 20
 
-
-#machine='kebnekaise'
-machine='colab'
+if 'SNIC_RESOURCE' in os.environ.keys() and os.environ['SNIC_RESOURCE']== 'kebnekaise':
+    machine='kebnekaise'
+else:
+    machine='colab'
 
 plotdir='plots_main/'
 outdirs = {'kebnekaise':'/pfs/nobackup/home/s/sebsc/pr_disagg/trained_models/',
@@ -94,9 +101,12 @@ norm_scale = np.nanmax(dsum)
 dsum = dsum / norm_scale
 
 # convert the subdaily data to fractions of the daily sum
+#TODO: make this more efficient. 1) directly modify data without copying firs, 2) maybe ommit forloop
 fractions = data.copy()
 for i in range(n_days):
     fractions[i] = data[i] / data[i].sum(axis=0) # sum over day
+
+data = fractions
 
 assert(np.nanmax(fractions)<=1)
 assert(np.nanmin(fractions)>=0)
@@ -136,6 +146,8 @@ def generate_real_samples(n_batch):
     assert(batch_cond.shape == (n_batch,ndomain,ndomain,1))
     assert(~np.any(np.isnan(batch)))
     assert(~np.any(np.isnan(batch_cond)))
+    assert(np.max(batch)<=1)
+    assert(np.min(batch)>=0)
 
     return [batch, batch_cond]
 
@@ -323,7 +335,7 @@ for i in range(n_plot):
         plt.imshow(X_real[i, j, :, :].squeeze(), vmin=0, vmax=1, cmap=plt.cm.hot_r)
         plt.axis('off')
 plt.colorbar()
-plt.savefig('real_samples.svg')
+plt.savefig(f'{plotdir}/real_samples.svg')
 print('start training')
 # train the generator and discriminator
 n_epochs=1000
@@ -371,51 +383,34 @@ for i in trange(n_epochs):
         if np.isnan(g_loss) or np.isnan(d_loss):
             raise ValueError('encountered nan in g_loss and/or d_loss')
 
-        # plot generated examples
-        if j %10 ==0:
+        if j %10 == 0:
+            # plot generated examples
             plt.figure(figsize=(25, 10))
             n_plot = 10
             [X_real, cond_real] = generate_fake_samples(n_plot)
-            for i in range(n_plot):
-                plt.subplot(n_plot, 25, i * 25 + 1)
-                plt.imshow(cond_fake[i, :, :].squeeze(), cmap=plt.cm.gist_earth_r, norm=LogNorm(vmin=0.01, vmax=1))
+            for iplot in range(n_plot):
+                plt.subplot(n_plot, 25, iplot * 25 + 1)
+                plt.imshow(cond_fake[iplot, :, :].squeeze(), cmap=plt.cm.gist_earth_r, norm=LogNorm(vmin=0.01, vmax=1))
                 plt.axis('off')
-                for j in range(1, 24):
-                    plt.subplot(n_plot, 25, i * 25 + j + 1)
-                    plt.imshow(X_fake[i, j, :, :].squeeze(), vmin=0, vmax=1, cmap=plt.cm.hot_r)
+                for jplot in range(1, 24):
+                    plt.subplot(n_plot, 25, iplot * 25 + jplot + 1)
+                    plt.imshow(X_fake[iplot, jplot, :, :].squeeze(), vmin=0, vmax=1, cmap=plt.cm.hot_r)
                     plt.axis('off')
             plt.colorbar()
-            plt.show()
-            plt.savefig(f'fake_samples{i:04d}_{j:04d}.svg')
+            plt.savefig(f'{plotdir}/fake_samples{i:04d}_{j:06d}.svg')
+            plt.close('all')
 
 
         hist['d_loss'].append(d_loss)
         hist['g_loss'].append(g_loss)
 
+        # save networks every 100th batch (they are quite large)
+        if i % 10 == 0:
+            gen.save(f'{outdir}/gen_{i:04d}_{j:06d}.h5')
+            disc.save(f'{outdir}/disc_{i:04d}_{j:06d}.h5')
+
     pd.DataFrame(hist).to_csv('hist.csv')
 
-
-    # plot generated examples
-    plt.figure(figsize=(25, 10))
-    n_plot = 10
-    [X_real, cond_real] = generate_fake_samples(n_plot)
-    for i in range(n_plot):
-        plt.subplot(n_plot, 25, i * 25 + 1)
-        plt.imshow(cond_fake[i, :, :].squeeze(), cmap=plt.cm.gist_earth_r, norm=LogNorm(vmin=0.01, vmax=1))
-        plt.axis('off')
-        for j in range(1, 24):
-            plt.subplot(n_plot, 25, i * 25 + j + 1)
-            plt.imshow(X_fake[i, j, :, :].squeeze(), vmin=0, vmax=1, cmap=plt.cm.hot_r)
-            plt.axis('off')
-    plt.colorbar()
-    plt.savefig(f'fake_samples{i:04d}_{j:04d}.svg')
-
-
-    plt.close('all')
-    # save networks every 10th epoch (they are quite large)
-    if i % 10 ==0:
-        gen.save(f'{outdir}/gen_{i:04d}.h5')
-        disc.save(f'{outdir}/disc_{i:04d}.h5')
 
 
 

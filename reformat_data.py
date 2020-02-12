@@ -18,7 +18,7 @@ tres=1 # [h]
 
 # END PARAMS
 # the radardata is 5 minute data, but in mm/h. so to get mm/day for the daysums,
-# we need to fivide by 60/5=12
+# we need to divide by 60/5=12
 conv_factor = 1/12
 
 datapath='/climstorage/sebastian/pr_disagg/smhi/netcdf/'
