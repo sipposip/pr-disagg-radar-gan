@@ -23,6 +23,12 @@ drive.mount('/content/drive')
 
 @author: Sebastian Scher
 
+
+TODO: notes: training with mmap works, but it is very slow!
+possible remedies: also intorudce enqueuer for the gan-training data (at the moment it is only
+for the discriminator)
+TODO: muliprocessing=Ture seems to help, explore this further. Works very well in fact!!
+
 """
 import pickle
 import os
@@ -64,7 +70,7 @@ if 'SNIC_RESOURCE' in os.environ.keys() and os.environ['SNIC_RESOURCE'] == 'kebn
     machine = 'kebnekaise'
 else:
     machine = 'colab'
-machine='misu160'
+
 plotdirs ={'kebnekaise': 'plots_main/',
            'misu160': 'plots_main/',
            'colab':'/content/drive/My Drive/data/smhi_radar/plots_main/'}
@@ -98,8 +104,6 @@ print('loading data')
 # load the data as memmap
 data = np.load(data_ifile, mmap_mode='r')
 
-# add empty channel dimension (necessary for keras, which expects a channel dimension)
-data = np.expand_dims(data, -1)
 
 indices_all = pickle.load(open(indices_file, 'rb'))
 # convert to array
@@ -109,9 +113,10 @@ indices_all = np.array(indices_all)
 print('finished loading data')
 
 # the data has dimensions (sample,hourofday,x,y)
-n_days, nhours, ny, nx, n_channel = data.shape
+n_days, nhours, ny, nx = data.shape
+n_channel=1
 # sanity checks
-assert (len(data.shape) == 5)
+assert (len(data.shape) == 4)
 assert (len(indices_all.shape) == 2)
 assert (indices_all.shape[1] == 3)
 assert (nhours == 24 // tres)
@@ -133,8 +138,10 @@ def generate_real_samples(n_batch):
 
         # now we select the data corresponding to these indices
 
-        data_wview = view_as_windows(data, (1, 1, ndomain, ndomain, 1))[..., 0, 0, 0, :, :, :]
+        data_wview = view_as_windows(data, (1, 1, ndomain, ndomain))[..., 0, 0, :,:]
         batch = data_wview[idcs_batch[:, 0], :, idcs_batch[:, 1], idcs_batch[:, 2]]
+        # add empty channel dimension (necessary for keras, which expects a channel dimension)
+        batch = np.expand_dims(batch, -1)
         # compute daily sum (which is the condition)
         batch_cond = np.sum(batch, axis=1) # daily sum
         # the data now is in mm/hour, but we want it as fractions of the daily sum for each day
@@ -163,13 +170,20 @@ def generate_latent_points(n_batch):
     #     tidx, iy,ix = idcs_batch[i]
     #     batch_cond[i,:,:] = dsum[tidx, iy:iy+ndomain, ix:ix+ndomain]
 
-    data_wview = view_as_windows(data, (1, 1, ndomain, ndomain, 1))[..., 0, 0, 0, :, :, :]
+    data_wview = view_as_windows(data, (1, 1, ndomain, ndomain))[..., 0, 0, :,:]
     batch = data_wview[idcs_batch[:, 0], :, idcs_batch[:, 1], idcs_batch[:, 2]]
+    # add empty channel dimension (necessary for keras, which expects a channel dimension)
+    batch = np.expand_dims(batch, -1)
     batch_cond = np.sum(batch, axis=1) # daily sum
 
     assert (batch_cond.shape == (n_batch, ndomain, ndomain, 1))
     assert (~np.any(np.isnan(batch_cond)))
     return [latent, batch_cond]
+
+
+def generate_latent_points_as_generator(n_batch):
+    while True:
+        yield generate_latent_points(n_batch)
 
 
 def generate_fake_samples(n_batch):
@@ -346,9 +360,15 @@ def train(n_epochs, batch_size, start_epoch=0):
     # create a dataqueue with the keras facilities. this allows
     # to prepare the data in parallel to the training
     sample_dataqueue = GeneratorEnqueuer(generate_real_samples(batch_size),
-                                         use_multiprocessing=False)
-    sample_dataqueue.start(workers=1, max_queue_size=10)
+                                         use_multiprocessing=True)
+    sample_dataqueue.start(workers=2, max_queue_size=10)
     sample_gen = sample_dataqueue.get()
+
+    # targets for loss function
+    gan_sample_dataqueue = GeneratorEnqueuer(generate_latent_points_as_generator(batch_size),
+                                         use_multiprocessing=True)
+    gan_sample_dataqueue.start(workers=2, max_queue_size=10)
+    gan_sample_gen = gan_sample_dataqueue.get()
 
     # targets for loss function
     valid = np.ones((batch_size, 1))
@@ -384,7 +404,7 @@ def train(n_epochs, batch_size, start_epoch=0):
             # train generator
             disc.trainable = False
             # prepare points in latent space as input for the generator
-            [latent, cond] = generate_latent_points(batch_size)
+            [latent, cond] = next(gan_sample_gen)
             # update the generator via the discriminator's error
             g_loss = gan.train_on_batch([latent, cond], valid)
             # summarize loss on this batch
