@@ -10,6 +10,16 @@ input: output from reformat_data.py and compute_valid_indices.py
 
 @internal: run on kebnekaise (using sbatch definitions on top of the file) and on colab
 
+on colab add the following on top of the first cell:
+try:
+  # %tensorflow_version only exists in Colab.
+  %tensorflow_version 2.x
+except Exception:
+  pass
+from google.colab import drive
+drive.mount('/content/drive')
+
+
 @author: Sebastian Scher
 
 """
@@ -46,21 +56,30 @@ latent_dim = 1024
 # a combination nof number of epochs and batch_size
 n_epoch_and_batch_size_list = ((5, 32), (5, 64), (5, 128), (5, 256))
 
+plot_format = 'png'
+
+# input and output directories. different for different machines
 if 'SNIC_RESOURCE' in os.environ.keys() and os.environ['SNIC_RESOURCE'] == 'kebnekaise':
     machine = 'kebnekaise'
 else:
     machine = 'colab'
 
-plotdir = 'plots_main/'
+plotdirs ={'kebnekaise': 'plots_main/',
+           'misu160': 'plots_main/',
+           'colab':'/content/drive/My Drive/data/smhi_radar/plots_main/'}
+plotdir = plotdirs[machine]
+
 outdirs = {'kebnekaise': '/pfs/nobackup/home/s/sebsc/pr_disagg/trained_models/',
            'misu160': '/climstorage/sebastian/pr_disagg/smhi/rained_models/',
            'colab': '/content/drive/My Drive/data/smhi_radar/trained_models/'}
 outdir = outdirs[machine]
+# note for colab: sometimes mkdir does not work that way. in this case
+# you have to create the directories manually
 os.system(f'mkdir -p {plotdir}')
 os.system(f'mkdir -p {outdir}')
 
 # load data and precomputed indices
-print('loading data')
+
 converted_data_paths = {'misu160': '/climstorage/sebastian/pr_disagg/smhi/preprocessed/',
                         'kebnekaise': '/home/s/sebsc/pfs/pr_disagg/smhi_radar/preprocessed',
                         'colab': '/content/drive/My Drive/data/smhi_radar/preprocessed/'}
@@ -74,7 +93,7 @@ data_ifile = f'{converted_data_path}/{startdate}-{enddate}_tres{tres}.np.npy'
 
 params = f'{startdate}-{enddate}-tp_thresh_daily{tp_thresh_daily}_n_thresh{n_thresh}_ndomain{ndomain}_stride{stride}'
 indices_file = f'{indices_data_path}/valid_indices_smhi_radar_{params}.pkl'
-
+print('loading data')
 data = np.load(data_ifile)
 
 # add empty channel dimension (necessary for keras, which expects a channel dimension)
@@ -330,7 +349,7 @@ for i in range(n_plot):
         plt.imshow(X_real[i, j, :, :].squeeze(), vmin=0, vmax=1, cmap=plt.cm.hot_r)
         plt.axis('off')
 plt.colorbar()
-plt.savefig(f'{plotdir}/real_samples.svg')
+plt.savefig(f'{plotdir}/real_samples.{plot_format}')
 
 hist = {'d_loss': [], 'g_loss': []}
 print(f'start training on {n_samples} samples')
@@ -397,7 +416,7 @@ def train(n_epochs, batch_size):
 
         if i % 1 == 0:
             # plot generated examples
-            plt.figure(figsize=(25, 10))
+            plt.figure(figsize=(25, 25))
             n_plot = 30
             X_fake, cond_fake = generate_fake_samples(n_plot)
             for iplot in range(n_plot):
@@ -409,14 +428,14 @@ def train(n_epochs, batch_size):
                     plt.imshow(X_fake[iplot, jplot, :, :].squeeze(), vmin=0, vmax=1, cmap=plt.cm.hot_r)
                     plt.axis('off')
             plt.colorbar()
-            plt.savefig(f'{plotdir}/fake_samples{i:04d}_{j:06d}.svg')
+            plt.savefig(f'{plotdir}/fake_samples{i:04d}_{j:06d}.{plot_format}')
 
             # plot loss
             plt.plot()
             plt.plot(hist['d_loss'], label='d_loss')
             plt.plot(hist['g_loss'], label='g_loss')
             plt.ylabel('batch')
-            plt.savefig(f'{plotdir}/training_loss.svg')
+            plt.savefig(f'{plotdir}/training_loss.{plot_format}')
             pd.DataFrame(hist).to_csv('hist.csv')
             plt.close('all')
 
