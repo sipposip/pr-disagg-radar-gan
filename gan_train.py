@@ -33,6 +33,7 @@ startdate = '20090101'
 enddate = '20091231'
 # enddate='20171231'
 ndomain = 16  # gridpoints
+stride=16
 tres = 1
 
 tp_thresh_daily = 5  # mm. in the radardate the unit is mm/h, but then on 5 minutes steps.
@@ -70,7 +71,7 @@ indices_data_path = indices_data_paths[machine]
 
 data_ifile = f'{converted_data_path}/{startdate}-{enddate}_tres{tres}.np.npy'
 
-params = f'{startdate}-{enddate}-tp_thresh_daily{tp_thresh_daily}_n_thresh{n_thresh}_ndomain{ndomain}'
+params = f'{startdate}-{enddate}-tp_thresh_daily{tp_thresh_daily}_n_thresh{n_thresh}_ndomain{ndomain}_stride{stride}'
 indices_file = f'{indices_data_path}/valid_indices_smhi_radar_{params}.pkl'
 
 data = np.load(data_ifile)
@@ -421,7 +422,7 @@ for i in trange(n_epochs):
 
 
         # save networks every 100th batch (they are quite large)
-        if i % 100 == 0:
+        if j % 100 == 0:
             gen.save(f'{outdir}/gen_{i:04d}_{j:06d}.h5')
             disc.save(f'{outdir}/disc_{i:04d}_{j:06d}.h5')
 

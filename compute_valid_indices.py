@@ -19,9 +19,10 @@ os.system('mkdir -p data')
 # the data is not complete (not all days are available)
 # PARAMS
 startdate='20090101'
-enddate='20091231'
-#enddate='20171231'
+#enddate='20091231'
+enddate='20171231'
 ndomain = 16  #gridpoints
+stride = 1 # |ndomain # in which steps to scan the whole domain
 tres = 1
 tp_thresh_daily = 5 # mm. in the radardate the unit is mm/h, but then on 5 minutes steps.
                     # the conversion is done automatically in this script
@@ -45,10 +46,9 @@ dsum = np.sum(data,axis=1)
 n_days,ny,nx = dsum.shape
 
 # compute all valid indices
-# for this, we try out all ndomain x ndomain squares, and check whether they have any missing data,
+# for this, we try out all ndomain x ndomain squares shifted by strides, and check whether they have any missing data,
 # and if not, whether they adhere to the criteria set by tp_thresh_daily and n_thresh
 # since this contains many for loops, we speed it up with numba
-
 
 @numba.jit
 def filter(dsum):
@@ -58,8 +58,8 @@ def filter(dsum):
         print(tidx,'/',n_days)
         sub = dsum[tidx]
         # loop over all possible boxes
-        for ii in range(0, ny - ndomain):
-            for jj in range(0, nx - ndomain):
+        for ii in range(0, ny - ndomain, stride):
+            for jj in range(0, nx - ndomain, stride):
                 subsub = sub[ii:ii + ndomain, jj:jj + ndomain]
                 # check for nan values
                 if not np.any(np.isnan(subsub)):
@@ -73,7 +73,7 @@ def filter(dsum):
 
 final_valid_idcs = filter(dsum)
 
-params=f'{startdate}-{enddate}-tp_thresh_daily{tp_thresh_daily}_n_thresh{n_thresh}_ndomain{ndomain}'
+params=f'{startdate}-{enddate}-tp_thresh_daily{tp_thresh_daily}_n_thresh{n_thresh}_ndomain{ndomain}_stride{stride}'
 pickle.dump(final_valid_idcs, open(f'data/valid_indices_smhi_radar_{params}.pkl','wb'))
 
 print(f'found {len(final_valid_idcs)} valid samples')
