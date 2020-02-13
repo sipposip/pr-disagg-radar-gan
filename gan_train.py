@@ -94,7 +94,7 @@ data_ifile = f'{converted_data_path}/{startdate}-{enddate}_tres{tres}.np.npy'
 params = f'{startdate}-{enddate}-tp_thresh_daily{tp_thresh_daily}_n_thresh{n_thresh}_ndomain{ndomain}_stride{stride}'
 indices_file = f'{indices_data_path}/valid_indices_smhi_radar_{params}.pkl'
 print('loading data')
-data = np.load(data_ifile)
+data = np.load(data_ifile)['data']
 
 # add empty channel dimension (necessary for keras, which expects a channel dimension)
 data = np.expand_dims(data, -1)
@@ -431,7 +431,7 @@ def train(n_epochs, batch_size):
             plt.savefig(f'{plotdir}/fake_samples{i:04d}_{j:06d}.{plot_format}')
 
             # plot loss
-            plt.plot()
+            plt.figure()
             plt.plot(hist['d_loss'], label='d_loss')
             plt.plot(hist['g_loss'], label='g_loss')
             plt.ylabel('batch')

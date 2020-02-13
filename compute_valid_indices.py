@@ -35,10 +35,10 @@ os.system('mkdir -p data')
 # the data is not complete (not all days are available)
 # PARAMS
 startdate = '20090101'
-# enddate='20091231'
-enddate = '20171231'
+enddate='20091231'
+#enddate = '20171231'
 ndomain = 16  # gridpoints
-stride = 1  # |ndomain # in which steps to scan the whole domain
+stride = ndomain  # |ndomain # in which steps to scan the whole domain
 tres = 1
 tp_thresh_daily = 5  # mm. in the radardate the unit is mm/h, but then on 5 minutes steps.
 # the conversion is done automatically in this script
@@ -50,9 +50,9 @@ if ndomain % 2 != 0:
 
 datapath = '/climstorage/sebastian/pr_disagg/smhi/preprocessed/'
 
-ifile = f'{datapath}/{startdate}-{enddate}_tres{tres}.np.npy'
+ifile = f'{datapath}/{startdate}-{enddate}_tres{tres}.npz'
 
-data = np.load(ifile)
+data = np.load(ifile)['data']
 
 if len(data.shape) != 4:
     raise ValueError(f'data has wrong number of dimensions {len(data.shape)} instead of 4')

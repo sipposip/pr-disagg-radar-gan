@@ -7,7 +7,7 @@ the data is
 1) summed to the desired timeresolution "tres" (default 1 hour)
 2) reshaped in a format that has hour of the day as separate dimension
     --> output format is (days,tperday,lat,lon)
-3) saved as a single .npy file
+3) saved as a single .npz file
 
 @internal: run on misu160
 
@@ -24,10 +24,10 @@ pbar = ProgressBar()
 pbar.register()
 
 
-
+#PARAMS
 startdate='20090101'
-# enddate='20091231'
-enddate='20171231'
+enddate='20091231'
+#enddate='20171231'
 tres=1 # [h]
 
 # END PARAMS
@@ -56,9 +56,8 @@ if len(ifiles) == 0:
 # they are automatically chunked per file (thus per day)
 data_raw = xr.open_mfdataset(ifiles, combine='nested', concat_dim='time')
 data_raw = data_raw['__xarray_dataarray_variable__']
-
-# # replace missing vals with nan
-# data = data_raw.where(data_raw != 255)
+# convert to 32bit
+data_raw = data_raw.astype('float32')
 
 # sum to desired timeresolution
 agg = data_raw.resample(time=f'{tres}h', label='left').sum(skipna=False)
@@ -76,10 +75,7 @@ reshaped = agg.reshape((ndays,t_per_day,ny,nx))
 
 final = reshaped
 
-# convert to 32bit
-final = final.astype('float32')
-
-np.save(f'{outpath}/{startdate}-{enddate}_tres{tres}.np',final)
+np.savez_compressed(f'{outpath}/{startdate}-{enddate}_tres{tres}.npz',data=final)
 
 
 
