@@ -9,6 +9,10 @@ the data is
     --> output format is (days,tperday,lat,lon)
 3) saved as a single .npz file
 
+
+TODO: inlcude normalization step here (so that we dont have to do in in the training script, which is
+complicated if we use memmap data
+
 @internal: run on misu160
 
 @author: Sebastian Scher
@@ -25,9 +29,11 @@ pbar.register()
 
 
 #PARAMS
-startdate='20090101'
-enddate='20091231'
-#enddate='20171231'
+#startdate='20090101'
+startdate='20100101'
+#enddate='20091231'
+enddate='20161231'
+enddate='20101231'
 tres=1 # [h]
 
 # END PARAMS
@@ -76,6 +82,4 @@ reshaped = agg.reshape((ndays,t_per_day,ny,nx))
 final = reshaped
 
 np.savez_compressed(f'{outpath}/{startdate}-{enddate}_tres{tres}.npz',data=final)
-
-
-
+np.save(f'{outpath}/{startdate}-{enddate}_tres{tres}', final)

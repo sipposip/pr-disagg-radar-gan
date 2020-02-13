@@ -21,13 +21,16 @@ from google.colab import drive
 drive.mount('/content/drive')
 
 
+terminology used here: the word "generator" is used both for the generator of the GAN, and for
+"python generators", which is a special type of iterable in python that we use here for feeding
+the input data into the network.
+
 @author: Sebastian Scher
 
-
-TODO: notes: training with mmap works, but it is very slow!
-possible remedies: also intorudce enqueuer for the gan-training data (at the moment it is only
-for the discriminator)
-TODO: muliprocessing=Ture seems to help, explore this further. Works very well in fact!!
+TODO: right now, no normalization is done on the data! this is because we cannot do normalization
+without loading the whole dataset!
+solutions: 1) do the normalization in reformat_data.py
+2) normalize with a fixed constant
 
 """
 import pickle
@@ -159,16 +162,11 @@ def generate_real_samples(n_batch):
 
 
 def generate_latent_points(n_batch):
-    # generate points in the latent space
+    # generate points in the latent space and a random condition
     latent = np.random.normal(size=(n_batch, latent_dim))
     # randomly select conditions
     ixs = np.random.randint(0, n_samples, size=n_batch)
     idcs_batch = indices_all[ixs]
-    # slow reference implementation
-    # batch_cond = np.empty((n_batch, ndomain, ndomain, n_channel), dtype='float32')
-    # for i in range(n_batch):
-    #     tidx, iy,ix = idcs_batch[i]
-    #     batch_cond[i,:,:] = dsum[tidx, iy:iy+ndomain, ix:ix+ndomain]
 
     data_wview = view_as_windows(data, (1, 1, ndomain, ndomain))[..., 0, 0, :,:]
     batch = data_wview[idcs_batch[:, 0], :, idcs_batch[:, 1], idcs_batch[:, 2]]

@@ -37,8 +37,8 @@ from skimage.util import view_as_windows
 from matplotlib.colors import LogNorm
 from tensorflow.keras.utils import GeneratorEnqueuer
 
-startdate = '20090101'
-enddate = '20091231'
+startdate = '20100101'
+enddate = '20101231'
 # enddate='20171231'
 ndomain = 16  # gridpoints
 stride = 16
@@ -54,7 +54,7 @@ n_disc = 5
 latent_dim = 1024
 # the training is done with increasing batch size. each tuple is
 # a combination nof number of epochs and batch_size
-n_epoch_and_batch_size_list = ((5, 32), (5, 64), (5, 128), (5, 256))
+n_epoch_and_batch_size_list = ((5, 32), (10, 64), (10, 128), (20, 256))
 
 plot_format = 'png'
 
@@ -132,6 +132,7 @@ dsum = dsum / norm_scale
 for i in range(n_days):
     data[i] = data[i] / data[i].sum(axis=0)  # sum over day
 
+# sanity checks
 assert (np.nanmax(data) <= 1)
 assert (np.nanmin(data) >= 0)
 
@@ -155,7 +156,7 @@ def generate_real_samples(n_batch):
         #     batch[i,:,:,:] = fractions[tidx, :, iy:iy+ndomain, ix:ix+ndomain]
         #     batch_cond[i,:,:] = dsum[tidx, iy:iy+ndomain, ix:ix+ndomain]
 
-        # fast implementation (3 timeas as gast for n_batch 1024)
+        # fast implementation (3 timeas as fast for n_batch 1024)
         data_wview = view_as_windows(data, (1, 1, ndomain, ndomain, 1))[..., 0, 0, 0, :, :, :]
         dsum_wview = view_as_windows(dsum, (1, ndomain, ndomain, 1))[..., 0, 0, :, :, :]
         batch = data_wview[idcs_batch[:, 0], :, idcs_batch[:, 1], idcs_batch[:, 2]]
@@ -430,21 +431,22 @@ def train(n_epochs, batch_size, start_epoch=0):
                     plt.axis('off')
             plt.colorbar()
             plt.suptitle(f'epoch {epoch:04d}')
-            plt.savefig(f'{plotdir}/fake_samples{epoch:04d}_{j:06d}.{plot_format}')
+            plt.savefig(f'{plotdir}/fake_samples_{params}_{epoch:04d}_{j:06d}.{plot_format}')
 
             # plot loss
             plt.figure()
             plt.plot(hist['d_loss'], label='d_loss')
             plt.plot(hist['g_loss'], label='g_loss')
             plt.ylabel('batch')
-            plt.savefig(f'{plotdir}/training_loss.{plot_format}')
+            plt.legend()
+            plt.savefig(f'{plotdir}/training_loss_{params}.{plot_format}')
             pd.DataFrame(hist).to_csv('hist.csv')
             plt.close('all')
 
         # save networks every 100th batch (they are quite large)
         if i % 1 == 0:
-            gen.save(f'{outdir}/gen_{epoch:04d}_{j:06d}.h5')
-            disc.save(f'{outdir}/disc_{epoch:04d}_{j:06d}.h5')
+            gen.save(f'{outdir}/gen_{params}_{epoch:04d}_{j:06d}.h5')
+            disc.save(f'{outdir}/disc_{params}_{epoch:04d}_{j:06d}.h5')
 
 
 # the training is done with increasing batch size,
