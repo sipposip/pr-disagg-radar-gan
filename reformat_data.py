@@ -1,4 +1,18 @@
 #! /climstorage/sebastian/anaconda3/envs/pr-disagg-env/bin/python
+"""
+this script reads in the netcdf radar data (output of convert_smhi_radardata.py),
+and converts it to a format suitable for training.
+
+the data is
+1) summed to the desired timeresolution "tres" (default 1 hour)
+2) reshaped in a format that has hour of the day as separate dimension
+    --> output format is (days,tperday,lat,lon)
+3) saved as a single .npy file
+
+@internal: run on misu160
+
+@author: Sebastian Scher
+"""
 
 import os
 import numpy as np
@@ -12,8 +26,8 @@ pbar.register()
 
 
 startdate='20090101'
-enddate='20091231'
-#enddate='20171231'
+# enddate='20091231'
+enddate='20171231'
 tres=1 # [h]
 
 # END PARAMS

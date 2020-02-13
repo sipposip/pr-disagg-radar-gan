@@ -1,17 +1,20 @@
 #! /pfs/nobackup/home/s/sebsc/miniconda3/envs/pr-disagg-env/bin/python
-
-
 # SBATCH -A SNIC2019-3-611
 # SBATCH --time=24:00:00
 # SBATCH --gres=gpu:v100:1
 """
-on misu160: #! /climstorage/sebastian/anaconda3/envs/pr-disagg-env/bin/python
+training script for the network.
+
+input: output from reformat_data.py and compute_valid_indices.py
+
+
+@internal: run on kebnekaise (using sbatch definitions on top of the file) and on colab
+
+@author: Sebastian Scher
 
 """
 import pickle
 import os
-import queue
-import threading
 import numpy as np
 import tensorflow as tf
 import pandas as pd
@@ -24,26 +27,24 @@ from skimage.util import view_as_windows
 from matplotlib.colors import LogNorm
 from tensorflow.keras.utils import GeneratorEnqueuer
 
-# session_conf = tf.compat.v1.ConfigProto(
-#       intra_op_parallelism_threads=10,
-#       inter_op_parallelism_threads=2)
-# sess = tf.compat.v1.Session(config=session_conf)
-
 startdate = '20090101'
 enddate = '20091231'
 # enddate='20171231'
 ndomain = 16  # gridpoints
-stride=16
+stride = 16
 tres = 1
 
 tp_thresh_daily = 5  # mm. in the radardate the unit is mm/h, but then on 5 minutes steps.
 # the conversion is done automatically in this script
 n_thresh = 20
 
-n_epochs = 1000
-batch_size = 32
+# neural network parameters
 clip_value = 0.01
 n_disc = 5
+latent_dim = 1024
+# the training is done with increasing batch size. each tuple is
+# a combination nof number of epochs and batch_size
+n_epoch_and_batch_size_list = ((5, 32), (5, 64), (5, 128), (5, 256))
 
 if 'SNIC_RESOURCE' in os.environ.keys() and os.environ['SNIC_RESOURCE'] == 'kebnekaise':
     machine = 'kebnekaise'
@@ -76,14 +77,14 @@ indices_file = f'{indices_data_path}/valid_indices_smhi_radar_{params}.pkl'
 
 data = np.load(data_ifile)
 
-# add empty channel dmiensions
+# add empty channel dimension (necessary for keras, which expects a channel dimension)
 data = np.expand_dims(data, -1)
 
 indices_all = pickle.load(open(indices_file, 'rb'))
 # convert to array
 indices_all = np.array(indices_all)
-# this has shapes (nsamples,3)
-# each ros is (tidx,yidx,xidx)
+# this has shape (nsamples,3)
+# each row is (tidx,yidx,xidx)
 print('finished loading data')
 
 # the data has dimensions (sample,hourofday,x,y)
@@ -109,19 +110,11 @@ norm_scale = np.nanmax(dsum)
 dsum = dsum / norm_scale
 
 # convert the subdaily data to fractions of the daily sum
-# TODO: make this more efficient. 1) directly modify data without copying firs, 2) maybe ommit forloop
-fractions = data.copy()
 for i in range(n_days):
-    fractions[i] = data[i] / data[i].sum(axis=0)  # sum over day
+    data[i] = data[i] / data[i].sum(axis=0)  # sum over day
 
-data = fractions
-
-assert (np.nanmax(fractions) <= 1)
-assert (np.nanmin(fractions) >= 0)
-
-latent_dim = 1024
-
-n_batch = 32
+assert (np.nanmax(data) <= 1)
+assert (np.nanmin(data) >= 0)
 
 
 def generate_real_samples(n_batch):
@@ -134,7 +127,7 @@ def generate_real_samples(n_batch):
 
         # now we select the data corresponding to these indices
 
-        # # slow implementatnion. kept here as reference because
+        # # slow implementation. kept here as reference because
         # # it is easier to understand than the fast implementation
         # batch = np.empty((n_batch, nhours, ndomain, ndomain, n_channel), dtype='float32')
         # batch_cond = np.empty((n_batch, ndomain, ndomain, n_channel), dtype='float32')
@@ -196,15 +189,6 @@ def wasserstein_loss(y_true, y_pred):
     # we use -1 for fake, and +1 for real labels
     return tf.reduce_mean(y_true * y_pred)
 
-
-# create a dataqueue with the keras facilities. this allows
-# to prepare the data in parallel to the training
-
-
-sample_dataqueue = GeneratorEnqueuer(generate_real_samples(batch_size),
-                                     use_multiprocessing=False)
-sample_dataqueue.start(workers=1, max_queue_size=10)
-sample_gen = sample_dataqueue.get()
 
 # optimizer recommended by WGAN paper
 optimizer = tf.keras.optimizers.RMSprop(lr=0.00005)
@@ -308,6 +292,7 @@ def create_generator():
     return model
 
 
+print('building networks')
 disc = create_discriminator()
 disc.summary()
 gen = create_generator()
@@ -325,16 +310,17 @@ gen_latent, gen_cond = gen.inputs
 gen_output = gen.output
 # connect  output and cond input from generator as inputs to discriminator
 gan_output = disc([gen_output, gen_cond])
-# define gan model as taking noise and cond and outputting a classification
+# define gan model as taking noise and cond and outputting a judgement
 gan = tf.keras.Model([gen_latent, gen_cond], gan_output)
-# compile model
 gan.compile(loss=wasserstein_loss, optimizer=optimizer)
+
+print('finished building networks')
 
 # plot some real samples
 # plot a couple of samples
-plt.figure(figsize=(25, 10))
-n_plot = batch_size
-[X_real, cond_real] = next(sample_gen)
+plt.figure(figsize=(25, 25))
+n_plot = 30
+[X_real, cond_real] = next(generate_real_samples(n_plot))
 for i in range(n_plot):
     plt.subplot(n_plot, 25, i * 25 + 1)
     plt.imshow(cond_real[i, :, :].squeeze(), cmap=plt.cm.gist_earth_r, norm=LogNorm(vmin=0.01, vmax=1))
@@ -346,59 +332,74 @@ for i in range(n_plot):
 plt.colorbar()
 plt.savefig(f'{plotdir}/real_samples.svg')
 
-valid = np.ones((batch_size, 1))
-fake = -np.ones((batch_size, 1))
-
-bat_per_epo = int(n_samples / batch_size)
 hist = {'d_loss': [], 'g_loss': []}
-print('start training')
-# train the generator and discriminator
-# manually enumerate epochs
-for i in trange(n_epochs):
-    # enumerate batches over the training set
-    for j in trange(bat_per_epo):
+print(f'start training on {n_samples} samples')
 
-        for _ in range(n_disc):
-            # train discrmininator
-            disc.trainable = True
-            # # get randomly selected 'real' samples
-            # [X_real, cond_real] = generate_real_samples(batch_size)
-            # # generate 'fake' examples
-            # [X_fake, cond_fake]= generate_fake_samples(batch_size)
 
-            # fetch a batch from the queue
-            [X_real, cond_real] = next(sample_gen)
-            X_fake, cond_fake = generate_fake_samples(batch_size)
-            d_loss_fake = disc.train_on_batch([X_fake, cond_fake], fake)
-            d_loss_real = disc.train_on_batch([X_real, cond_real], valid)
-            d_loss = np.mean([d_loss_real, d_loss_fake])
+def train(n_epochs, batch_size):
+    """
+        train with fixed batch_size for given epochs
+        make some example plots and save model after each epoch
+    """
 
-            # Clip discriminator weights
-            for l in disc.layers:
-                weights = l.get_weights()
-                weights = [np.clip(w, -clip_value, clip_value) for w in weights]
-                l.set_weights(weights)
+    # create a dataqueue with the keras facilities. this allows
+    # to prepare the data in parallel to the training
+    sample_dataqueue = GeneratorEnqueuer(generate_real_samples(batch_size),
+                                         use_multiprocessing=False)
+    sample_dataqueue.start(workers=1, max_queue_size=10)
+    sample_gen = sample_dataqueue.get()
 
-        # train generator
-        disc.trainable = False
-        # prepare points in latent space as input for the generator
-        [latent, cond] = generate_latent_points(batch_size)
-        # update the generator via the discriminator's error
-        g_loss = gan.train_on_batch([latent, cond], valid)
-        # summarize loss on this batch
-        print(f'{i + 1}, {j + 1}/{bat_per_epo}, d_loss {d_loss}' + \
-              f' g:{g_loss} ')  # , d_fake:{d_loss_fake} d_real:{d_loss_real}')
+    # targets for loss function
+    valid = np.ones((batch_size, 1))
+    fake = -np.ones((batch_size, 1))
 
-        if np.isnan(g_loss) or np.isnan(d_loss):
-            raise ValueError('encountered nan in g_loss and/or d_loss')
+    bat_per_epo = int(n_samples / batch_size)
+    for i in trange(n_epochs):
+        # enumerate batches over the training set
+        for j in trange(bat_per_epo):
 
-        hist['d_loss'].append(d_loss)
-        hist['g_loss'].append(g_loss)
+            for _ in range(n_disc):
+                # train discrmininator
+                disc.trainable = True
+                # # get randomly selected 'real' samples
+                # [X_real, cond_real] = generate_real_samples(batch_size)
+                # # generate 'fake' examples
+                # [X_fake, cond_fake]= generate_fake_samples(batch_size)
 
-        if j % 50 == 0:
+                # fetch a batch from the queue
+                [X_real, cond_real] = next(sample_gen)
+                X_fake, cond_fake = generate_fake_samples(batch_size)
+                d_loss_fake = disc.train_on_batch([X_fake, cond_fake], fake)
+                d_loss_real = disc.train_on_batch([X_real, cond_real], valid)
+                d_loss = np.mean([d_loss_real, d_loss_fake])
+
+                # Clip discriminator weights
+                for l in disc.layers:
+                    weights = l.get_weights()
+                    weights = [np.clip(w, -clip_value, clip_value) for w in weights]
+                    l.set_weights(weights)
+
+            # train generator
+            disc.trainable = False
+            # prepare points in latent space as input for the generator
+            [latent, cond] = generate_latent_points(batch_size)
+            # update the generator via the discriminator's error
+            g_loss = gan.train_on_batch([latent, cond], valid)
+            # summarize loss on this batch
+            print(f'{i + 1}, {j + 1}/{bat_per_epo}, d_loss {d_loss}' + \
+                  f' g:{g_loss} ')  # , d_fake:{d_loss_fake} d_real:{d_loss_real}')
+
+            if np.isnan(g_loss) or np.isnan(d_loss):
+                raise ValueError('encountered nan in g_loss and/or d_loss')
+
+            hist['d_loss'].append(d_loss)
+            hist['g_loss'].append(g_loss)
+
+        if i % 1 == 0:
             # plot generated examples
             plt.figure(figsize=(25, 10))
-            n_plot = 10
+            n_plot = 30
+            X_fake, cond_fake = generate_fake_samples(n_plot)
             for iplot in range(n_plot):
                 plt.subplot(n_plot, 25, iplot * 25 + 1)
                 plt.imshow(cond_fake[iplot, :, :].squeeze(), cmap=plt.cm.gist_earth_r, norm=LogNorm(vmin=0.01, vmax=1))
@@ -419,11 +420,13 @@ for i in trange(n_epochs):
             pd.DataFrame(hist).to_csv('hist.csv')
             plt.close('all')
 
-
-
         # save networks every 100th batch (they are quite large)
-        if j % 100 == 0:
+        if i % 1 == 0:
             gen.save(f'{outdir}/gen_{i:04d}_{j:06d}.h5')
             disc.save(f'{outdir}/disc_{i:04d}_{j:06d}.h5')
 
 
+# the training is done with increasing batch size,
+# as defined in n_epoch_and_batch_size_list at the beginning of the script
+for n_epochs, batch_size in n_epoch_and_batch_size_list:
+    train(n_epochs, batch_size)
