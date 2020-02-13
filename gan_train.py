@@ -89,7 +89,7 @@ indices_data_paths = {'misu160': 'data/',
                       'colab': '/content/drive/My Drive/data/smhi_radar/preprocessed/'}
 indices_data_path = indices_data_paths[machine]
 
-data_ifile = f'{converted_data_path}/{startdate}-{enddate}_tres{tres}.np.npy'
+data_ifile = f'{converted_data_path}/{startdate}-{enddate}_tres{tres}.npz'
 
 params = f'{startdate}-{enddate}-tp_thresh_daily{tp_thresh_daily}_n_thresh{n_thresh}_ndomain{ndomain}_stride{stride}'
 indices_file = f'{indices_data_path}/valid_indices_smhi_radar_{params}.pkl'
@@ -355,7 +355,7 @@ hist = {'d_loss': [], 'g_loss': []}
 print(f'start training on {n_samples} samples')
 
 
-def train(n_epochs, batch_size):
+def train(n_epochs, batch_size, start_epoch=0):
     """
         train with fixed batch_size for given epochs
         make some example plots and save model after each epoch
@@ -374,6 +374,7 @@ def train(n_epochs, batch_size):
 
     bat_per_epo = int(n_samples / batch_size)
     for i in trange(n_epochs):
+        epoch = 1 + i + start_epoch
         # enumerate batches over the training set
         for j in trange(bat_per_epo):
 
@@ -405,7 +406,7 @@ def train(n_epochs, batch_size):
             # update the generator via the discriminator's error
             g_loss = gan.train_on_batch([latent, cond], valid)
             # summarize loss on this batch
-            print(f'{i + 1}, {j + 1}/{bat_per_epo}, d_loss {d_loss}' + \
+            print(f'{epoch}, {j + 1}/{bat_per_epo}, d_loss {d_loss}' + \
                   f' g:{g_loss} ')  # , d_fake:{d_loss_fake} d_real:{d_loss_real}')
 
             if np.isnan(g_loss) or np.isnan(d_loss):
@@ -428,7 +429,8 @@ def train(n_epochs, batch_size):
                     plt.imshow(X_fake[iplot, jplot, :, :].squeeze(), vmin=0, vmax=1, cmap=plt.cm.hot_r)
                     plt.axis('off')
             plt.colorbar()
-            plt.savefig(f'{plotdir}/fake_samples{i:04d}_{j:06d}.{plot_format}')
+            plt.suptitle(f'epoch {epoch:04d}')
+            plt.savefig(f'{plotdir}/fake_samples{epoch:04d}_{j:06d}.{plot_format}')
 
             # plot loss
             plt.figure()
@@ -441,11 +443,13 @@ def train(n_epochs, batch_size):
 
         # save networks every 100th batch (they are quite large)
         if i % 1 == 0:
-            gen.save(f'{outdir}/gen_{i:04d}_{j:06d}.h5')
-            disc.save(f'{outdir}/disc_{i:04d}_{j:06d}.h5')
+            gen.save(f'{outdir}/gen_{epoch:04d}_{j:06d}.h5')
+            disc.save(f'{outdir}/disc_{epoch:04d}_{j:06d}.h5')
 
 
 # the training is done with increasing batch size,
 # as defined in n_epoch_and_batch_size_list at the beginning of the script
-for n_epochs, batch_size in n_epoch_and_batch_size_list:
-    train(n_epochs, batch_size)
+start_epoch = 0
+for n_epochs, batch_size in  n_epoch_and_batch_size_list:
+    train(n_epochs, batch_size, start_epoch)
+    start_epoch = start_epoch + n_epochs #this is only needed for correct plot labelling
