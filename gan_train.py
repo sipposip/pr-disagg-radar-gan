@@ -89,12 +89,12 @@ indices_data_paths = {'misu160': 'data/',
                       'colab': '/content/drive/My Drive/data/smhi_radar/preprocessed/'}
 indices_data_path = indices_data_paths[machine]
 
-data_ifile = f'{converted_data_path}/{startdate}-{enddate}_tres{tres}.npz'
+data_ifile = f'{converted_data_path}/{startdate}-{enddate}_tres{tres}.npy'
 
 params = f'{startdate}-{enddate}-tp_thresh_daily{tp_thresh_daily}_n_thresh{n_thresh}_ndomain{ndomain}_stride{stride}'
 indices_file = f'{indices_data_path}/valid_indices_smhi_radar_{params}.pkl'
 print('loading data')
-data = np.load(data_ifile)['data']
+data = np.load(data_ifile)
 
 # add empty channel dimension (necessary for keras, which expects a channel dimension)
 data = np.expand_dims(data, -1)

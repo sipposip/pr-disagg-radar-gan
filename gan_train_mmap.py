@@ -1,7 +1,7 @@
 #! /pfs/nobackup/home/s/sebsc/miniconda3/envs/pr-disagg-env/bin/python
-# SBATCH -A SNIC2019-3-611
-# SBATCH --time=24:00:00
-# SBATCH --gres=gpu:v100:1
+#SBATCH -A SNIC2019-3-611
+#SBATCH --time=4-00:00:00
+#SBATCH --gres=gpu:v100:1
 """
 training script for the network. this branch
 loads the data as memmap (so not into RAM)
@@ -47,16 +47,20 @@ from skimage.util import view_as_windows
 from matplotlib.colors import LogNorm
 from tensorflow.keras.utils import GeneratorEnqueuer
 
-startdate = '20100101'
-enddate = '20101231'
+startdate = '20090101'
+enddate = '20161231'
 # enddate='20171231'
 ndomain = 16  # gridpoints
-stride = 16
+stride = 8
 tres = 1
 
 tp_thresh_daily = 5  # mm. in the radardate the unit is mm/h, but then on 5 minutes steps.
 # the conversion is done automatically in this script
 n_thresh = 20
+
+# normalization of daily sums
+# we ues the 99.9 percentile of 2010
+norm_scale = 127.4
 
 # neural network parameters
 clip_value = 0.01
@@ -132,6 +136,7 @@ n_samples = len(indices_all)
 
 
 def generate_real_samples(n_batch):
+    """get random sampples and do the last preprocessing on them"""
     while True:
         # get random sample of indices from the precomputed indices
         # for this we generate random indices for the index list (confusing termoonology, since we use
@@ -147,10 +152,13 @@ def generate_real_samples(n_batch):
         batch = np.expand_dims(batch, -1)
         # compute daily sum (which is the condition)
         batch_cond = np.sum(batch, axis=1) # daily sum
+
         # the data now is in mm/hour, but we want it as fractions of the daily sum for each day
         for i in range(n_batch):
             batch[i] = batch[i] / batch_cond[i]
 
+        # normalize daily sum
+        batch_cond = batch_cond / norm_scale
         assert (batch.shape == (n_batch, nhours, ndomain, ndomain, 1))
         assert (batch_cond.shape == (n_batch, ndomain, ndomain, 1))
         assert (~np.any(np.isnan(batch)))
@@ -173,7 +181,8 @@ def generate_latent_points(n_batch):
     # add empty channel dimension (necessary for keras, which expects a channel dimension)
     batch = np.expand_dims(batch, -1)
     batch_cond = np.sum(batch, axis=1) # daily sum
-
+    # normalize daily sum
+    batch_cond = batch_cond / norm_scale
     assert (batch_cond.shape == (n_batch, ndomain, ndomain, 1))
     assert (~np.any(np.isnan(batch_cond)))
     return [latent, batch_cond]
@@ -290,9 +299,8 @@ def create_generator():
         tf.keras.layers.LeakyReLU(alpha=0.2),
         # output 24x16x16x1
         tf.keras.layers.Conv3D(1, (3, 3, 3), activation='linear', padding='same', kernel_initializer=init),
-        tf.keras.layers.Activation(lambda x: tf.keras.activations.softmax(x, axis=1)),
         # softmax per gridpoint, thus over nhours
-        # tf.keras.layers.Activation('tanh'),
+        tf.keras.layers.Softmax(axis=0),
         # check for Nans (only for debugging)
         tf.keras.layers.Lambda(
             lambda x: tf.debugging.check_numerics(x, 'found nan in output of per_gridpoint_softmax')),
@@ -444,8 +452,8 @@ def train(n_epochs, batch_size, start_epoch=0):
 
         # save networks every 100th batch (they are quite large)
         if i % 1 == 0:
-            gen.save(f'{outdir}/gen_{params}_{epoch:04d}_{j:06d}.h5')
-            disc.save(f'{outdir}/disc_{params}_{epoch:04d}_{j:06d}.h5')
+            gen.save(f'{outdir}/gen_{params}_{epoch:04d}.h5')
+            disc.save(f'{outdir}/disc_{params}_{epoch:04d}.h5')
 
 
 # the training is done with increasing batch size,

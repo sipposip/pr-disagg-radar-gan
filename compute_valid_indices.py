@@ -17,7 +17,7 @@ these indices can then be used the following way:
 idcs = final_valid_idcs[0]
 sub = data[idcs[0],:,idcs[1]:idcs[1]+ndomain,idcs[2]:idcs[2]+ndomain]
 
-@internal: run on misu160
+@internal: run on misu160 and kebnekaise
 
 @author: Sebastian Scher
 """
@@ -34,13 +34,13 @@ pbar.register()
 os.system('mkdir -p data')
 # the data is not complete (not all days are available)
 # PARAMS
-#startdate = '20090101'
+startdate = '20090101'
 #enddate='20091231'
-startdate = '20100101'
-enddate='20101231'
-#enddate = '20161231'
+#startdate = '20100101'
+#enddate='20101231'
+enddate = '20161231'
 ndomain = 16  # gridpoints
-stride = 8  # |ndomain # in which steps to scan the whole domain
+stride = 2  # |ndomain # in which steps to scan the whole domain
 tres = 1
 tp_thresh_daily = 5  # mm. in the radardate the unit is mm/h, but then on 5 minutes steps.
 # the conversion is done automatically in this script
@@ -61,7 +61,6 @@ if len(data.shape) != 4:
     raise ValueError(f'data has wrong number of dimensions {len(data.shape)} instead of 4')
 
 # compute daily sum, which is the sum over the hour axis
-#dsum = np.sum(data, axis=1)
 n_days,nhour, ny, nx = data.shape
 
 
@@ -78,7 +77,7 @@ def filter(data):
     for tidx in numba.prange(n_days):
         print(tidx, '/', n_days)
         # daily sum
-        sub = np.nanmean(data[tidx],axis=0)
+        sub = np.sum(data[tidx],axis=0)
         # loop over all possible boxes
         for ii in range(0, ny - ndomain, stride):
             for jj in range(0, nx - ndomain, stride):

@@ -1,3 +1,8 @@
+#! /proj/bolinc/users/x_sebsc/anaconda3/envs/pr-disagg-env/bin/python
+#SBATCH -N1
+#SBATCH -A snic2019-1-2
+#SBATCH -t 1:30:00
+#SBATCH --mem=363GB
 #! /climstorage/sebastian/anaconda3/envs/pr-disagg-env/bin/python
 """
 this script reads in the netcdf radar data (output of convert_smhi_radardata.py),
@@ -10,10 +15,10 @@ the data is
 3) saved as a single .npz file
 
 
-TODO: inlcude normalization step here (so that we dont have to do in in the training script, which is
-complicated if we use memmap data
+note that this script is not very memory efficient. if you dont have enough RAM,
+then it would be better to process each year individually
 
-@internal: run on misu160
+@internal: run on tetralith
 
 @author: Sebastian Scher
 """
@@ -29,11 +34,11 @@ pbar.register()
 
 
 #PARAMS
-#startdate='20090101'
-startdate='20100101'
+startdate='20090101'
+#startdate='20100101'
 #enddate='20091231'
 enddate='20161231'
-enddate='20101231'
+#enddate='20101231'
 tres=1 # [h]
 
 # END PARAMS
@@ -41,12 +46,14 @@ tres=1 # [h]
 # we need to divide by 60/5=12
 conv_factor = 1/12
 
-datapath='/climstorage/sebastian/pr_disagg/smhi/netcdf/'
+#datapath='/climstorage/sebastian/pr_disagg/smhi/netcdf/'
+datapath='/proj/bolinc/users/x_sebsc/pr_disagg/smhi/netcdf/'
 
-outpath='/climstorage/sebastian/pr_disagg/smhi/preprocessed/'
+#outpath='/climstorage/sebastian/pr_disagg/smhi/preprocessed/'
+outpath='/proj/bolinc/users/x_sebsc/pr_disagg/smhi/preprocessed/'
 os.system(f'mkdir -p {outpath}')
 
-# create list of available filies
+# create list of available files
 dates_all = pd.date_range(startdate,enddate,freq='1d')
 ifiles = []
 for date in dates_all:
