@@ -27,10 +27,6 @@ the input data into the network.
 
 @author: Sebastian Scher
 
-TODO: right now, no normalization is done on the data! this is because we cannot do normalization
-without loading the whole dataset!
-solutions: 1) do the normalization in reformat_data.py
-2) normalize with a fixed constant
 
 """
 import pickle
