@@ -51,17 +51,18 @@ if ndomain % 2 != 0:
     raise ValueError(f'ndomain must be an even number')
 
 datapath = '/climstorage/sebastian/pr_disagg/smhi/preprocessed/'
+datapath = '/home/s/sebsc/pfs/pr_disagg/smhi_radar/preprocessed'
 
-ifile = f'{datapath}/{startdate}-{enddate}_tres{tres}.npz'
+ifile = f'{datapath}/{startdate}-{enddate}_tres{tres}.npy'
 
-data = np.load(ifile)['data']
+data = np.load(ifile, mmap_mode='r')
 
 if len(data.shape) != 4:
     raise ValueError(f'data has wrong number of dimensions {len(data.shape)} instead of 4')
 
 # compute daily sum, which is the sum over the hour axis
-dsum = np.sum(data, axis=1)
-n_days, ny, nx = dsum.shape
+#dsum = np.sum(data, axis=1)
+n_days,nhour, ny, nx = data.shape
 
 
 # compute all valid indices
@@ -71,12 +72,13 @@ n_days, ny, nx = dsum.shape
 
 
 @numba.jit
-def filter(dsum):
+def filter(data):
     final_valid_idcs = []
     # loop over timeslices
     for tidx in numba.prange(n_days):
         print(tidx, '/', n_days)
-        sub = dsum[tidx]
+        # daily sum
+        sub = np.nanmean(data[tidx],axis=0)
         # loop over all possible boxes
         for ii in range(0, ny - ndomain, stride):
             for jj in range(0, nx - ndomain, stride):
@@ -91,7 +93,7 @@ def filter(dsum):
     return final_valid_idcs
 
 
-final_valid_idcs = filter(dsum)
+final_valid_idcs = filter(data)
 
 params = f'{startdate}-{enddate}-tp_thresh_daily{tp_thresh_daily}_n_thresh{n_thresh}_ndomain{ndomain}_stride{stride}'
 pickle.dump(final_valid_idcs, open(f'data/valid_indices_smhi_radar_{params}.pkl', 'wb'))
