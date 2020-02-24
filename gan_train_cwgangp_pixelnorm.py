@@ -363,7 +363,7 @@ def create_generator():
         # output 24x16x16x1
         tf.keras.layers.Conv3D(1, (3, 3, 3), activation='linear', padding='same', kernel_initializer=init),
         # softmax per gridpoint, thus over nhours
-        tf.keras.layers.Softmax(axis=0),
+        tf.keras.layers.Softmax(axis=1),
         # check for Nans (only for debugging)
         tf.keras.layers.Lambda(
             lambda x: tf.debugging.check_numerics(x, 'found nan in output of per_gridpoint_softmax')),
