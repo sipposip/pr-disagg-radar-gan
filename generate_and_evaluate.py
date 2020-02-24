@@ -26,7 +26,7 @@ tp_thresh_daily = 5  # mm. in the radardate the unit is mm/h, but then on 5 minu
 # the conversion is done automatically in this script
 n_thresh = 20
 
-epoch=14
+epoch=50
 
 # normalization of daily sums
 # we ues the 99.9 percentile of 2010
@@ -40,14 +40,14 @@ if 'SNIC_RESOURCE' in os.environ.keys() and os.environ['SNIC_RESOURCE'] == 'kebn
 else:
     machine = 'colab'
 
-plotdirs ={'kebnekaise': 'plots_main/',
-           'misu160': 'plots_main/',
-           'colab':'/content/drive/My Drive/data/smhi_radar/plots_main/'}
+plotdirs ={'kebnekaise': 'plots_generated/',
+           'misu160': 'plots_generated/',
+           'colab':'/content/drive/My Drive/data/smhi_radar/plots_generated/'}
 plotdir = plotdirs[machine]
 
-outdirs = {'kebnekaise': '/pfs/nobackup/home/s/sebsc/pr_disagg/trained_models/',
-           'misu160': '/climstorage/sebastian/pr_disagg/smhi/rained_models/',
-           'colab': '/content/drive/My Drive/data/smhi_radar/trained_models/'}
+outdirs = {'kebnekaise': '/pfs/nobackup/home/s/sebsc/pr_disagg/trained_models/wgangp/',
+           'misu160': '/climstorage/sebastian/pr_disagg/smhi/rained_models/wgangp/',
+           'colab': '/content/drive/My Drive/data/smhi_radar/trained_models/wgangp/'}
 outdir = outdirs[machine]
 # note for colab: sometimes mkdir does not work that way. in this case
 # you have to create the directories manually
