@@ -30,12 +30,8 @@ the input data into the network.
 https://github.com/kongyanye/cwgan-gp
 
 
-
+needs tensorflow >=2.1
 conda install tensorflow-gpu==2.1.0
-
-and in batch scrip tass
-ml load CUDA/10.1.105
-(anaconda installs a too old cuda version)
 
 
 interesing:
@@ -322,21 +318,14 @@ def create_discriminator():
 
 
 def create_generator():
-    # TODO: open questions: how to best include the condition
-    # jussi has a flat input, so he flattens the condition,
-    # and then adds this to the noise, so simply obtaining 1 flat input
-    # weight initialization]
-    # however, one could also argue that there is spatial structure in the condition,
-    # and we should use convolution first. so do a architecture similar to the discrimnator
-    # to do some convs and then a flattening, and use this as input
-    # we could also check how this is done for image stuff (there probably is image stuff that uses images as
-    # condition)
+
     # for the moment, the flat approach is used
     init = tf.keras.initializers.RandomNormal(stddev=0.02)
     # define model
 
     n_nodes = 256 * 2 * 2 * 3
     in_latent = tf.keras.layers.Input(shape=(latent_dim,))
+    # the condition is a 2d array (ndomain x ndomain), we simply flatten it
     in_cond = tf.keras.layers.Input(shape=(ndomain, ndomain, n_channel))
     in_cond_flat = tf.keras.layers.Flatten()(in_cond)
     in_combined = tf.keras.layers.Concatenate()([in_latent, in_cond_flat])
@@ -362,7 +351,7 @@ def create_generator():
         tf.keras.layers.LeakyReLU(alpha=0.2),
         # output 24x16x16x1
         tf.keras.layers.Conv3D(1, (3, 3, 3), activation='linear', padding='same', kernel_initializer=init),
-        # softmax per gridpoint, thus over nhours
+        # softmax per gridpoint, thus over nhours, which is axis 1 (Softmax also counts the batch axis)
         tf.keras.layers.Softmax(axis=1),
         # check for Nans (only for debugging)
         tf.keras.layers.Lambda(
@@ -486,7 +475,6 @@ def train(n_epochs, _batch_size, start_epoch=0):
 
             for _ in range(n_disc):
                 # fetch a batch from the queue
-                #TODO: include latent generation in sample_gen
                 [X_real, cond_real] = next(sample_gen)
                 latent = np.random.normal(size=(batch_size, latent_dim))
                 d_loss = critic_model.train_on_batch([X_real, cond_real,latent], [valid, fake, dummy])
