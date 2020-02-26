@@ -398,49 +398,58 @@ plt.savefig(f'{plotdir}/distribution_mapplot_{params}_{epoch:04d}.svg')
 ## for a single real one, generate a large
 # number of fake distributions, and then
 # plot the areamean in a lineplot
-
+# we generate 100 fake distributions with different noise accross the samples
+# and additionally 10 fake ones that use the same noise for all plots
+# the latter we plot in the same color (1 seperate color for each generated one)
+# so that we can compare them accross the plots
 n_to_generate = 20
 n_fake_per_real = 100
+n_fake_per_real_samenoise = 10
 plotcount = 0
 hours = np.arange(1, 24 + 1)
+# use same noise for all samples
+latent_shared = np.random.normal(size=(n_fake_per_real_samenoise, latent_dim))
 for isample in trange(n_to_generate):
     real, cond = generate_real_samples_and_conditions(1)
-
-    # , make several predictions with different latent noise
-    latent = np.random.normal(size=(n_fake_per_real, latent_dim))
+    latent= np.random.normal(size=(n_fake_per_real, latent_dim))
     # for efficiency reason, we dont make a single forecast with the network, but
     # we batch all n_fake_per_real together
     cond_batch = np.repeat(cond, repeats=n_fake_per_real, axis=0)
+    cond_batch_samenoise = np.repeat(cond, repeats=n_fake_per_real_samenoise, axis=0)
     generated = gen.predict([latent, cond_batch], verbose=1)
+    generated_samenoise = gen.predict([latent_shared, cond_batch_samenoise], verbose=1)
     real = real.squeeze()
     generated = generated.squeeze()
+    generated_samenoise = generated_samenoise.squeeze()
     # compute are mean
     amean_real = np.mean(real * cond.squeeze() * norm_scale, (1, 2))
     amean_gen = np.mean(generated * cond.squeeze() * norm_scale, (2, 3))  # generated has a time dimension
+    amean_gen_samenoise = np.mean(generated_samenoise * cond.squeeze() * norm_scale, (2, 3))  # generated has a time dimension
 
     plt.figure(figsize=(7, 3))
-    plt.plot(hours, amean_gen.T, label='_nolegend_', alpha=0.5, color='#1b9e77')
+    plt.plot(hours, amean_gen.T, label='_nolegend_', alpha=0.3,color='#1b9e77')
+    plt.plot(hours, amean_gen_samenoise.T, label='_nolegend_', alpha=1)
     plt.plot(hours, amean_real, label='real', color='#d95f02')
     plt.xlabel('hour')
     plt.ylabel('precipitation [mm/hour]')
     plt.legend()
     sns.despine()
-    plt.savefig(f'{plotdir}/distribution_lineplot_{params}_{epoch:04d}_{isample:04d}.svg')
+    plt.savefig(f'{plotdir}/distribution_lineplot_samenosie_{params}_{epoch:04d}_{isample:04d}.svg')
     plt.close('all')
 
 # take two conditions, and
 # then plot the areamean of the resulting distributions, and check whether they are different
+# we use the same noise for both, to avoid finding effects that only might come from the noise
 n_fake_per_real = 1000
+latent = np.random.normal(size=(n_fake_per_real, latent_dim))
 for isample in trange(20):
     real1, cond1 = generate_real_samples_and_conditions(1)
-    latent1 = np.random.normal(size=(n_fake_per_real, latent_dim))
+
     cond_batch1 = np.repeat(cond1, repeats=n_fake_per_real, axis=0)
-    generated1 = gen.predict([latent1, cond_batch1], verbose=1)
+    generated1 = gen.predict([latent, cond_batch1], verbose=1)
     real2, cond2 = generate_real_samples_and_conditions(1)
-    #latent2 = np.random.normal(size=(n_fake_per_real, latent_dim))
-    latent2 = latent1 # we use the same noise to ensure that any differences are not simply called by different noise
     cond_batch2 = np.repeat(cond2, repeats=n_fake_per_real, axis=0)
-    generated2 = gen.predict([latent2, cond_batch2], verbose=1)
+    generated2 = gen.predict([latent, cond_batch2], verbose=1)
 
     amean_fraction_real1 = np.mean(real1.squeeze(), (1, 2)).squeeze()
     amean_fraction_gen1 = np.mean(generated1, (2, 3)).squeeze()  # generated has a time dimension
@@ -475,6 +484,6 @@ for isample in trange(20):
     ax3 = fig.add_subplot(gs[1, :])
     sns.boxplot('hour', 'fraction', hue='cond', data=df, ax=ax3)
     sns.despine()
-    plt.savefig(f'{plotdir}/check_conditional_dist_{params}_{epoch:04d}_{isample:04d}.svg')
+    plt.savefig(f'{plotdir}/check_conditional_dist_samenoise_{params}_{epoch:04d}_{isample:04d}.svg')
 
     plt.close('all')
