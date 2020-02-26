@@ -1,3 +1,8 @@
+#! /pfs/nobackup/home/s/sebsc/miniconda3/envs/pr-disagg-env/bin/python
+#SBATCH -A SNIC2019-3-611
+#SBATCH --time=06:00:00
+#SBATCH -N 1
+
 import pickle
 import os
 import numpy as np
@@ -5,11 +10,9 @@ import tensorflow as tf
 import pandas as pd
 import matplotlib
 import matplotlib.colors as mcolors
-
 matplotlib.use('agg')
 from pylab import plt
 import seaborn as sns
-import pandas as pd
 from tqdm import trange
 from skimage.util import view_as_windows
 from matplotlib.colors import LogNorm
@@ -31,9 +34,10 @@ tp_thresh_daily = 5  # mm. in the radardate the unit is mm/h, but then on 5 minu
 # the conversion is done automatically in this script
 n_thresh = 20
 
-epoch = 50
-#TODO HACK
-epoch = 3
+# here we need to choose which epoch we use from the saved models (we saved them at the end of every
+# epoch). visual inspection of the images generated from the training set showed
+# that after epoch 20, things starts to detoriate. Therefore we use epoch 20.
+epoch = 20
 # normalization of daily sums
 # we ues the 99.9 percentile of 2010
 norm_scale = 127.4
@@ -109,7 +113,7 @@ print(f'evaluate in {n_samples} samples')
 print('load the trained generator')
 generator_file = f'{outdir}/gen_{params}_{epoch:04d}.h5'
 
-
+# we need the custom layer PixelNormalization to load the generator
 class PixelNormalization(tf.keras.layers.Layer):
     # initialize the layer
     def __init__(self, **kwargs):
@@ -143,7 +147,6 @@ gen = tf.keras.models.load_model(generator_file, compile=False,
 def wasserstein_loss(y_true, y_pred):
     # we use -1 for fake, and +1 for real labels
     return tf.reduce_mean(y_true * y_pred)
-
 
 gen.compile(loss=wasserstein_loss, optimizer=tf.keras.optimizers.RMSprop(lr=0.00005))
 
@@ -181,32 +184,6 @@ def generate_real_samples_and_conditions(n_batch):
 
 
 plt.rcParams['savefig.bbox'] = 'tight'
-# colormap for precipitation, adapted from https://unidata.github.io/python-gallery/examples/Precipitation_Map.html
-clevs = [0, 0.1, 0.3, 0.5, 1, 2.5, 5, 7.5, 10, 15, 20, 30, 40,
-         50, 70, 100, 150, 200, 250, 300, 400]
-cmap_data = [(1.0, 1.0, 1.0),
-             (0.3137255012989044, 0.8156862854957581, 0.8156862854957581),
-             (0.0, 1.0, 1.0),
-             (0.0, 0.8784313797950745, 0.501960813999176),
-             (0.0, 0.7529411911964417, 0.0),
-             (0.501960813999176, 0.8784313797950745, 0.0),
-             (1.0, 1.0, 0.0),
-             (1.0, 0.6274510025978088, 0.0),
-             (1.0, 0.0, 0.0),
-             (1.0, 0.125490203499794, 0.501960813999176),
-             (0.9411764740943909, 0.250980406999588, 1.0),
-             (0.501960813999176, 0.125490203499794, 1.0),
-             (0.250980406999588, 0.250980406999588, 1.0),
-             (0.125490203499794, 0.125490203499794, 0.501960813999176),
-             (0.125490203499794, 0.125490203499794, 0.125490203499794),
-             (0.501960813999176, 0.501960813999176, 0.501960813999176),
-             (0.8784313797950745, 0.8784313797950745, 0.8784313797950745),
-             (0.9333333373069763, 0.8313725590705872, 0.7372549176216125),
-             (0.8549019694328308, 0.6509804129600525, 0.47058823704719543),
-             (0.6274510025978088, 0.42352941632270813, 0.23529411852359772),
-             (0.4000000059604645, 0.20000000298023224, 0.0)]
-cmap = mcolors.ListedColormap(cmap_data, 'precipitation')
-plotnorm = mcolors.BoundaryNorm(clevs, cmap.N)
 cmap = plt.cm.gist_earth_r
 plotnorm = LogNorm(vmin=0.01, vmax=50)
 
@@ -231,7 +208,6 @@ for ibatch in trange(n_batches):
         # we batch all n_fake_per_real together
         cond_batch = np.repeat(cond[np.newaxis], repeats=n_fake_per_real, axis=0)
         generated = gen.predict([latent, cond_batch])
-
 
         # make a matrix of mapplots.
         # first column: condition (daily mean), the same for every row
@@ -314,13 +290,10 @@ for ibatch in trange(n_batches):
 
         plt.close('all')
 
-
-
 # compute statistics over
 # many generated smaples
-
-#TODO: this could be made faster via batching the predictions (right now only single predictions)
-n_sample = 5000
+# we compute the areamean, and the timmean
+n_sample = 10000
 amean_fraction_gen = []
 amean_fraction_real = []
 amean_gen = []
@@ -331,91 +304,177 @@ fraction_tmean_real = np.zeros((nhours, ndomain, ndomain))
 tmean_gen = np.zeros((nhours, ndomain, ndomain))
 tmean_real = np.zeros((nhours, ndomain, ndomain))
 
+# for each real conditoin, we crate 1 fake sample
 for i in trange(n_sample):
     real, cond = generate_real_samples_and_conditions(1)
     latent = np.random.normal(size=(1, latent_dim))
     generated = gen.predict([latent, cond])
-    
-    #NOTE: when batch_size >1, then the axis in the mean functions needs to be adapted!
+
     generated = generated.squeeze()
     real = real.squeeze()
     cond = cond.squeeze()
     # compute area means
     amean_fraction_gen.append(np.mean(generated, axis=(1, 2)).squeeze())
     amean_fraction_real.append(np.mean(real, axis=(1, 2)).squeeze())
-    amean_gen.append(np.mean(generated*cond*norm_scale, axis=(1, 2)).squeeze())
-    amean_real.append(np.mean(real*cond*norm_scale, axis=(1, 2)).squeeze())
+    amean_gen.append(np.mean(generated * cond * norm_scale, axis=(1, 2)).squeeze())
+    amean_real.append(np.mean(real * cond * norm_scale, axis=(1, 2)).squeeze())
 
-    fraction_tmean_gen += generated.squeeze()/n_sample
-    fraction_tmean_real += real.squeeze()/n_sample
-    tmean_gen += (generated*cond*norm_scale).squeeze()/n_sample
-    tmean_real += (real*cond*norm_scale).squeeze()/n_sample
-
+    # add to the accumulated timmeans
+    fraction_tmean_gen += generated.squeeze() / n_sample
+    fraction_tmean_real += real.squeeze() / n_sample
+    tmean_gen += (generated * cond * norm_scale).squeeze() / n_sample
+    tmean_real += (real * cond * norm_scale).squeeze() / n_sample
 
 amean_fraction_gen = np.array(amean_fraction_gen)
 amean_fraction_real = np.array(amean_fraction_real)
 amean_gen = np.array(amean_gen)
 amean_real = np.array(amean_real)
 
-
-# convert to pandas data frame, with time ofday ('hour') as additional column
-
+# convert to pandas data frame, with timeofday ('hour') as additional column
 res_df = []
 for i in range(24):
-    _df1 = pd.DataFrame({'fraction':amean_fraction_gen[:,i],
-                         'precip': amean_gen[:,i],
-                        'typ':'generated',
-                       'hour':i+1}, index=np.arange(len(amean_gen)))
+    _df1 = pd.DataFrame({'fraction': amean_fraction_gen[:, i],
+                         'precip': amean_gen[:, i],
+                         'typ': 'generated',
+                         'hour': i + 1}, index=np.arange(len(amean_gen)))
     _df2 = pd.DataFrame({'fraction': amean_fraction_real[:, i].squeeze(),
                          'precip': amean_real[:, i],
-                        'typ': 'real',
-                        'hour': i+1},  index=np.arange(len(amean_gen)))
+                         'typ': 'real',
+                         'hour': i + 1}, index=np.arange(len(amean_gen)))
     res_df.append(_df1)
     res_df.append(_df2)
-
+# make boxplot
 df = pd.concat(res_df)
 plt.figure()
 plt.subplot(211)
-sns.boxplot('hour', 'precip',data=df, hue='typ', showfliers=False)
+sns.boxplot('hour', 'precip', data=df, hue='typ', showfliers=False)
+plt.xlabel('')
+sns.despine()
 plt.subplot(212)
-sns.boxplot('hour', 'fraction',data=df, hue='typ', showfliers=False)
+sns.boxplot('hour', 'fraction', data=df, hue='typ', showfliers=False)
+sns.despine()
 plt.suptitle(f'n={n_sample}')
 plt.savefig(f'{plotdir}/daily_cycle_{params}_{epoch:04d}.svg')
 
-
+# plot the timemean distributions per hour
 fig = plt.figure(figsize=(25, 6))
 for hour in range(24):
 
-    ax = plt.subplot(4,24,hour+1)
+    ax = plt.subplot(4, 24, hour + 1)
 
-    ax.annotate(f'{hour+1:02d}'':00', xy=(0.5, 1), xytext=(0, 5), xycoords='axes fraction', textcoords='offset points',
+    ax.annotate(f'{hour + 1:02d}'':00', xy=(0.5, 1), xytext=(0, 5), xycoords='axes fraction',
+                textcoords='offset points',
                 size='large', ha='center', va='baseline')
     if hour == 0:
         ax.annotate('frac real', xy=(0, 0.5), xytext=(-5, 0), xycoords='axes fraction', textcoords='offset points',
-                     size='large', ha='right', va='center', rotation='vertical')
+                    size='large', ha='right', va='center', rotation='vertical')
     im_frac = plt.imshow(fraction_tmean_real[hour], vmin=0, vmax=0.07, cmap=plt.cm.hot_r)
     plt.axis('off')
     if hour == 23:
         plt.colorbar()
-    ax = plt.subplot(4, 24, hour + 1 + 24*1)
+    ax = plt.subplot(4, 24, hour + 1 + 24 * 1)
     if hour == 0:
         ax.annotate('frac gen', xy=(0, 0.5), xytext=(-5, 0), xycoords='axes fraction', textcoords='offset points',
-                     size='large', ha='right', va='center', rotation='vertical')
+                    size='large', ha='right', va='center', rotation='vertical')
     plt.imshow(fraction_tmean_gen[hour], vmin=0, vmax=0.07, cmap=plt.cm.hot_r)
     plt.axis('off')
     ax = plt.subplot(4, 24, hour + 1 + 24 * 2)
     if hour == 0:
         ax.annotate('precip real', xy=(0, 0.5), xytext=(-5, 0), xycoords='axes fraction', textcoords='offset points',
-                     size='large', ha='right', va='center', rotation='vertical')
+                    size='large', ha='right', va='center', rotation='vertical')
     im_precip = plt.imshow(tmean_real[hour], cmap=plt.cm.Blues_r, vmin=0, vmax=1)
     plt.axis('off')
     ax = plt.subplot(4, 24, hour + 1 + 24 * 3)
     if hour == 0:
         ax.annotate('precip gen', xy=(0, 0.5), xytext=(-5, 0), xycoords='axes fraction', textcoords='offset points',
-                     size='large', ha='right', va='center', rotation='vertical')
+                    size='large', ha='right', va='center', rotation='vertical')
     plt.imshow(tmean_gen[hour], cmap=plt.cm.Blues_r, vmin=0, vmax=1)
     plt.axis('off')
     if hour == 23:
         plt.colorbar()
 
 plt.savefig(f'{plotdir}/distribution_mapplot_{params}_{epoch:04d}.svg')
+
+## for a single real one, generate a large
+# number of fake distributions, and then
+# plot the areamean in a lineplot
+
+n_to_generate = 20
+n_fake_per_real = 100
+plotcount = 0
+hours = np.arange(1, 24 + 1)
+for isample in trange(n_to_generate):
+    real, cond = generate_real_samples_and_conditions(1)
+
+    # , make several predictions with different latent noise
+    latent = np.random.normal(size=(n_fake_per_real, latent_dim))
+    # for efficiency reason, we dont make a single forecast with the network, but
+    # we batch all n_fake_per_real together
+    cond_batch = np.repeat(cond, repeats=n_fake_per_real, axis=0)
+    generated = gen.predict([latent, cond_batch], verbose=1)
+    real = real.squeeze()
+    generated = generated.squeeze()
+    # compute are mean
+    amean_real = np.mean(real * cond.squeeze() * norm_scale, (1, 2))
+    amean_gen = np.mean(generated * cond.squeeze() * norm_scale, (2, 3))  # generated has a time dimension
+
+    plt.figure(figsize=(7, 3))
+    plt.plot(hours, amean_gen.T, label='_nolegend_', alpha=0.5, color='#1b9e77')
+    plt.plot(hours, amean_real, label='real', color='#d95f02')
+    plt.xlabel('hour')
+    plt.ylabel('precipitation [mm/hour]')
+    plt.legend()
+    sns.despine()
+    plt.savefig(f'{plotdir}/distribution_lineplot_{params}_{epoch:04d}_{isample:04d}.svg')
+    plt.close('all')
+
+# take two conditions, and
+# then plot the areamean of the resulting distributions, and check whether they are different
+n_fake_per_real = 1000
+for isample in trange(20):
+    real1, cond1 = generate_real_samples_and_conditions(1)
+    latent1 = np.random.normal(size=(n_fake_per_real, latent_dim))
+    cond_batch1 = np.repeat(cond1, repeats=n_fake_per_real, axis=0)
+    generated1 = gen.predict([latent1, cond_batch1], verbose=1)
+    real2, cond2 = generate_real_samples_and_conditions(1)
+    #latent2 = np.random.normal(size=(n_fake_per_real, latent_dim))
+    latent2 = latent1 # we use the same noise to ensure that any differences are not simply called by different noise
+    cond_batch2 = np.repeat(cond2, repeats=n_fake_per_real, axis=0)
+    generated2 = gen.predict([latent2, cond_batch2], verbose=1)
+
+    amean_fraction_real1 = np.mean(real1.squeeze(), (1, 2)).squeeze()
+    amean_fraction_gen1 = np.mean(generated1, (2, 3)).squeeze()  # generated has a time dimension
+    amean_fraction_real2 = np.mean(real2.squeeze(), (1, 2)).squeeze()
+    amean_fraction_gen2 = np.mean(generated2.squeeze(), (2, 3)).squeeze()  # generated has a time dimension
+
+    res_df = []
+    for i in range(24):
+        _df1 = pd.DataFrame({'fraction': amean_fraction_gen1[:, i],
+                             'cond': 1,
+                             'hour': i + 1}, index=np.arange(len(amean_fraction_gen1)))
+        _df2 = pd.DataFrame({'fraction': amean_fraction_gen2[:, i],
+                             'cond': 2,
+                             'hour': i + 1}, index=np.arange(len(amean_fraction_gen1)))
+        res_df.append(_df1)
+        res_df.append(_df2)
+
+    df = pd.concat(res_df)
+
+    fig = plt.figure(constrained_layout=True, figsize=(6, 4.8))
+    gs = fig.add_gridspec(2, 2)
+    ax1 = fig.add_subplot(gs[0, 0])
+    im = ax1.imshow(cond1.squeeze(), cmap=cmap, norm=plotnorm)
+    plt.title('cond 1')
+    plt.axis('off')
+    plt.colorbar(im)
+    ax2 = fig.add_subplot(gs[0, 1])
+    im = ax2.imshow(cond2.squeeze(), cmap=cmap, norm=plotnorm)
+    plt.title('cond 2')
+    plt.axis('off')
+    plt.colorbar(im)
+    ax3 = fig.add_subplot(gs[1, :])
+    sns.boxplot('hour', 'fraction', hue='cond', data=df, ax=ax3)
+    sns.despine()
+    plt.savefig(f'{plotdir}/check_conditional_dist_{params}_{epoch:04d}_{isample:04d}.svg')
+
+    plt.close('all')
