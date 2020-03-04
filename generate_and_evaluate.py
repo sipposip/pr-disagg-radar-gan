@@ -2,6 +2,12 @@
 #SBATCH -A SNIC2019-3-611
 #SBATCH --time=06:00:00
 #SBATCH -N 1
+"""
+this script uses the trained generator to create precipitation scenarios.
+a number of daily sum conditions are sampled from the test-data,
+and for each sub-daily scenarios are generated with the generator.
+The results are shown in various plots
+"""
 
 import pickle
 import os
@@ -18,14 +24,14 @@ from skimage.util import view_as_windows
 from matplotlib.colors import LogNorm
 from tensorflow.keras import backend as K
 
+# we need to specify train start and enddate to get correct filenames
 train_startdate = '20090101'
 train_enddate = '20161231'
-# eval_startdate = '20090101'
-# eval_enddate = '20161231'
 
 eval_startdate = '20170101'
 eval_enddate = '20181231'
 
+# parameters (need to be the same as in training)
 ndomain = 16  # gridpoints
 stride = 16
 tres = 1
@@ -67,7 +73,7 @@ outdir = outdirs[machine]
 os.system(f'mkdir -p {plotdir}')
 os.system(f'mkdir -p {outdir}')
 
-# load data and precomputed indices
+# load data and precomputed indices for the test data
 
 converted_data_paths = {'misu160': '/climstorage/sebastian/pr_disagg/smhi/preprocessed/',
                         'kebnekaise': '/home/s/sebsc/pfs/pr_disagg/smhi_radar/preprocessed',

@@ -28,6 +28,8 @@ the input data into the network.
 @author: Sebastian Scher
 
 
+https://github.com/keras-team/keras-contrib/blob/master/examples/improved_wgan.py
+
 """
 import pickle
 import os

@@ -3,13 +3,13 @@
 #SBATCH --time=3-00:00:00
 #SBATCH --gres=gpu:v100:1
 """
-training script for the network. this branch
-loads the data as memmap (so not into RAM)
+training script for the network. it loads the data as memmap, so it does not need large amounts of RAM
 
 input: output from reformat_data.py and compute_valid_indices.py
 
 
-@internal: run on kebnekaise (using sbatch definitions on top of the file) and on colab
+@internal: run on kebnekaise (using sbatch definitions on top of the file) and on colab. final run
+make on kebnekaise
 
 on colab add the following on top of the first cell:
 try:
@@ -27,16 +27,8 @@ the input data into the network.
 
 @author: Sebastian Scher
 
-https://github.com/kongyanye/cwgan-gp
-
-
 needs tensorflow >=2.1
 conda install tensorflow-gpu==2.1.0
-
-
-interesing:
-https://arxiv.org/pdf/1905.02417.pdf (FCC-GAN)
-https://github.com/soumith/ganhacks/issues/14
 
 """
 import pickle
@@ -58,7 +50,7 @@ from tensorflow.keras.layers import Input
 
 startdate = '20090101'
 enddate = '20161231'
-# enddate='20171231'
+
 ndomain = 16  # gridpoints
 stride = 16
 tres = 1

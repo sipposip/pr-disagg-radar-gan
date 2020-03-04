@@ -15,8 +15,8 @@ the data is
 3) saved as a single .npz file
 
 
-note that this script is not very memory efficient. if you dont have enough RAM,
-then it would be better to process each year individually
+note that this script is not very memory efficient (the whole dataset needs to be loaded into ram).
+if you dont have enough RAM, then it would be better to process each year individually
 
 @internal: run on tetralith
 
@@ -34,11 +34,12 @@ pbar.register()
 
 
 #PARAMS
-startdate='20090101'
-#startdate='20100101'
-#enddate='20091231'
-enddate='20161231'
-#enddate='20101231'
+# for training data:
+startdate = '20090101'
+enddate = '20161231'
+# for test data:
+# startdate = '20170101'
+# enddate = '20181231'
 tres=1 # [h]
 
 # END PARAMS
@@ -46,10 +47,8 @@ tres=1 # [h]
 # we need to divide by 60/5=12
 conv_factor = 1/12
 
-#datapath='/climstorage/sebastian/pr_disagg/smhi/netcdf/'
 datapath='/proj/bolinc/users/x_sebsc/pr_disagg/smhi/netcdf/'
 
-#outpath='/climstorage/sebastian/pr_disagg/smhi/preprocessed/'
 outpath='/proj/bolinc/users/x_sebsc/pr_disagg/smhi/preprocessed/'
 os.system(f'mkdir -p {outpath}')
 

@@ -30,11 +30,19 @@ the input data into the network.
 https://github.com/kongyanye/cwgan-gp
 
 note: needs td >=2.1
-on kebnekaise:  /pfs/nobackup/home/s/sebsc/miniconda3/envs/pr-disagg-env/bin/pip install --upgrade tensorflow-gpu
+on kebnekaise:  /pfs/nobackup/home/s/sebsc/miniconda3/bin/conda install --name=pr-disagg-env install tensorflow-gpu==2.1.0
 
+and in batch scrip tass
+ml load CUDA/10.1.105
+(anaconda installs a too old cuda version)
+
+
+TODO: check whether increasing batch_size actually works with RandomWeightedAverage
+(got an error when increasing form 128 to 256, but not for the earlier increases...)
 
 interesing:
 https://arxiv.org/pdf/1905.02417.pdf (FCC-GAN)
+https://github.com/soumith/ganhacks/issues/14
 
 """
 import pickle
@@ -77,7 +85,8 @@ latent_dim = 1024
 batch_size = 32 # this is used as global variable in randomweightedaverage
 # the training is done with increasing batch size. each tuple is
 # a combination nof number of epochs and batch_size
-n_epoch_and_batch_size_list = ((5, 32), (10, 64), (10, 128), (20, 256))
+#n_epoch_and_batch_size_list = ((5, 32), (10, 64), (10, 128), (20, 256))
+n_epoch_and_batch_size_list = ((50, 32),)
 
 plot_format = 'png'
 
@@ -479,37 +488,35 @@ def train(n_epochs, _batch_size, start_epoch=0):
             hist['d_loss'].append(d_loss)
             hist['g_loss'].append(g_loss)
 
-        if i % 1 == 0:
-            # plot generated examples
-            plt.figure(figsize=(25, 25))
-            n_plot = 30
-            X_fake, cond_fake = generate_fake_samples(n_plot)
-            for iplot in range(n_plot):
-                plt.subplot(n_plot, 25, iplot * 25 + 1)
-                plt.imshow(cond_fake[iplot, :, :].squeeze(), cmap=plt.cm.gist_earth_r, norm=LogNorm(vmin=0.01, vmax=1))
+
+        # plot generated examples
+        plt.figure(figsize=(25, 25))
+        n_plot = 30
+        X_fake, cond_fake = generate_fake_samples(n_plot)
+        for iplot in range(n_plot):
+            plt.subplot(n_plot, 25, iplot * 25 + 1)
+            plt.imshow(cond_fake[iplot, :, :].squeeze(), cmap=plt.cm.gist_earth_r, norm=LogNorm(vmin=0.01, vmax=1))
+            plt.axis('off')
+            for jplot in range(1, 24):
+                plt.subplot(n_plot, 25, iplot * 25 + jplot + 1)
+                plt.imshow(X_fake[iplot, jplot, :, :].squeeze(), vmin=0, vmax=1, cmap=plt.cm.hot_r)
                 plt.axis('off')
-                for jplot in range(1, 24):
-                    plt.subplot(n_plot, 25, iplot * 25 + jplot + 1)
-                    plt.imshow(X_fake[iplot, jplot, :, :].squeeze(), vmin=0, vmax=1, cmap=plt.cm.hot_r)
-                    plt.axis('off')
-            plt.colorbar()
-            plt.suptitle(f'epoch {epoch:04d}')
-            plt.savefig(f'{plotdir}/fake_samples_{params}_{epoch:04d}_{j:06d}.{plot_format}')
+        plt.colorbar()
+        plt.suptitle(f'epoch {epoch:04d}')
+        plt.savefig(f'{plotdir}/fake_samples_{params}_{epoch:04d}_{j:06d}.{plot_format}')
 
-            # plot loss
-            plt.figure()
-            plt.plot(hist['d_loss'], label='d_loss')
-            plt.plot(hist['g_loss'], label='g_loss')
-            plt.ylabel('batch')
-            plt.legend()
-            plt.savefig(f'{plotdir}/training_loss_{params}.{plot_format}')
-            pd.DataFrame(hist).to_csv('hist.csv')
-            plt.close('all')
+        # plot loss
+        plt.figure()
+        plt.plot(hist['d_loss'], label='d_loss')
+        plt.plot(hist['g_loss'], label='g_loss')
+        plt.ylabel('batch')
+        plt.legend()
+        plt.savefig(f'{plotdir}/training_loss_{params}.{plot_format}')
+        pd.DataFrame(hist).to_csv('hist.csv')
+        plt.close('all')
 
-        # save networks
-        if i % 1 == 0:
-            generator.save(f'{outdir}/gen_{params}_{epoch:04d}.h5')
-            critic.save(f'{outdir}/disc_{params}_{epoch:04d}.h5')
+        generator.save(f'{outdir}/gen_{params}_{epoch:04d}.h5')
+        critic.save(f'{outdir}/disc_{params}_{epoch:04d}.h5')
 
 
 # the training is done with increasing batch size,

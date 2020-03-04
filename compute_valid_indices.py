@@ -34,13 +34,14 @@ pbar.register()
 os.system('mkdir -p data')
 # the data is not complete (not all days are available)
 # PARAMS
+# for training data:
 startdate = '20090101'
-#enddate='20091231'
-#startdate = '20100101'
-#enddate='20101231'
 enddate = '20161231'
+# for test data:
+# startdate = '20170101'
+# enddate = '20181231'
 ndomain = 16  # gridpoints
-stride = 2  # |ndomain # in which steps to scan the whole domain
+stride = 16  # |ndomain # in which steps to scan the whole domain
 tres = 1
 tp_thresh_daily = 5  # mm. in the radardate the unit is mm/h, but then on 5 minutes steps.
 # the conversion is done automatically in this script

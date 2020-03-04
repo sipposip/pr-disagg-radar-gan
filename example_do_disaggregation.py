@@ -4,6 +4,8 @@ for generating hourly precipitation scenarios.
 we feed the generator with a made up field of daily precpitation sums, and then generate a couple
 of scenarios from it, and plot these scenarios
 
+the network was trained with tensorflow 2
+
 """
 
 import numpy as np
