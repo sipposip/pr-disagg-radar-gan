@@ -19,6 +19,7 @@ import matplotlib.colors as mcolors
 matplotlib.use('agg')
 from pylab import plt
 import seaborn as sns
+import scipy.stats
 from tqdm import trange
 from skimage.util import view_as_windows
 from matplotlib.colors import LogNorm
@@ -434,6 +435,13 @@ for isample in trange(20):
         res_df.append(_df2)
 
     df = pd.concat(res_df)
+    df.to_csv(f'{plotdir}/check_conditional_dist_samenoise_{params}_{epoch:04d}_{isample:04d}.csv')
+    pvals_per_hour = []
+    for hour in range(1,24+1):
+        sub = df.query('hour==@hour')
+        _, p = scipy.stats.ks_2samp(sub.query('cond==1')['fraction'], sub.query('cond==2')['fraction'])
+        pvals_per_hour.append(p)
+    np.savetxt(f'{plotdir}/check_conditional_dist_samenoise_KSpval{params}_{epoch:04d}_{isample:04d}.txt', pvals_per_hour)
     for showfliers in (True, False):
         fig = plt.figure(constrained_layout=True, figsize=(6, 4.8))
         gs = fig.add_gridspec(2, 2)
