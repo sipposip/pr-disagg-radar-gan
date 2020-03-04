@@ -8,7 +8,7 @@ This repository contains the trained network, and an example script on how to us
 
 Additionally the repository contains all necessary scripts to fully replicate the study:
 
-download_smhi_radardata.py downloads the raw radar data in geotiff format
+[download_smhi_radardata.py] downloads the raw radar data in geotiff format
 
 convert_smhi_radardata.py converts the raw radardate to daily netcdf files, including conversion
 from radar reflectivities to precipitation
