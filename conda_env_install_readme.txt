@@ -1,1 +1,0 @@
-/home/s/sebsc/pfs/miniconda3/bin/conda create --name=pr-disagg-env tensorflow-gpu matplotlib scikit-image pandas xarray tqdm numba ipython
