@@ -1,6 +1,10 @@
-RainDisaggGAN is a method that uses GANs for temporal downsampling spatial precipitation patterns.
+#RainDisaggGAN
 
-The method is described in our paper (INSERT LINK)
+RainDisaggGAN is a method that uses GANs for temporal downsampling of spatial precipitation patterns. It learns to
+generate possible hourly patterns of precipitation, given the daily sum. It is trained on hourly precipitation radar
+data from SMHI.
+
+The method is described in our paper (INSERT LINK) by Sebastian Scher and Stefanie Peßenteiner
 
 
 This repository contains the trained network, an example script on how to use it for temporaral disaggregation,
@@ -56,11 +60,15 @@ it outputs a .pkl file with the indices
 [generate_and_evaluate.py](generate_and_evaluate.py) evaluates the GAN and makes analysis plots
 
 The GAN is built and trained with Tensorflow 2.1.
-The software was developed on Linux and to some amount relies on UNIX-like system commands.
+The software was developed on Linux and to some amount relies on UNIX-like system commands (directories are
+created with the `mkdir - p` command).
 Small adaptions might be necessary to run it on a windows computer. The example script 
 [generate_and_evaluate.py](generate_and_evaluate.py) does not use UNIX-system commands and should run on any system.
 Training the GAN is very slow without a GPU, but using the trained generator is computationally inexpensive and can 
 easily be done on CPUs (even on a laptop)
+
+[pr-disagg-env.yml](pr-disagg-env.yml) contains the anaconda environment used for training. If you use anaconda,
+ you can install the same anaconda environment via `conda env create -f pr-disagg-env.yml`. 
 
 Note that all datapaths in the scripts (except in the example scripts) need to be adapted to your local system.
 Also the SLURM commands on top of the files need to be adapted if you use SLURM. If your don't use SLURM, you can simply ignore them.
