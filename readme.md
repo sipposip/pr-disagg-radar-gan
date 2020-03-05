@@ -1,4 +1,4 @@
-#RainDisaggGAN
+# RainDisaggGAN
 
 RainDisaggGAN is a method that uses GANs for temporal downsampling of spatial precipitation patterns. It learns to
 generate possible hourly patterns of precipitation, given the daily sum. It is trained on hourly precipitation radar
