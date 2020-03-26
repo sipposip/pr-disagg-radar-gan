@@ -7,7 +7,6 @@ this script uses the trained generator to create precipitation scenarios.
 a number of daily sum conditions are sampled from the test-data,
 and for each sub-daily scenarios are generated with the generator.
 The results are shown in various plots
-TODO: update .yml file in the repo (I additionally installed statsmodels in kebnekaise)
 """
 
 import pickle
