@@ -7,6 +7,7 @@ this script uses the trained generator to create precipitation scenarios.
 a number of daily sum conditions are sampled from the test-data,
 and for each sub-daily scenarios are generated with the generator.
 The results are shown in various plots
+TODO: update .yml file in the repo (I additionally installed statsmodels in kebnekaise)
 """
 
 import pickle
@@ -24,6 +25,9 @@ from tqdm import trange
 from skimage.util import view_as_windows
 from matplotlib.colors import LogNorm
 from tensorflow.keras import backend as K
+
+# for reproducability, we set a fixed seed to the random number generator
+np.random.seed(354)
 
 # we need to specify train start and enddate to get correct filenames
 train_startdate = '20090101'
@@ -297,6 +301,7 @@ for ibatch in trange(n_batches):
 
         plt.close('all')
 
+
 # compute statistics over
 # many generated smaples
 # we compute the areamean,
@@ -305,7 +310,8 @@ amean_fraction_gen = []
 amean_fraction_real = []
 amean_gen = []
 amean_real = []
-
+dists_real = []
+dists_gen = []
 
 # for each real conditoin, we crate 1 fake sample
 for i in trange(n_sample):
@@ -321,13 +327,53 @@ for i in trange(n_sample):
     amean_fraction_real.append(np.mean(real, axis=(1, 2)).squeeze())
     amean_gen.append(np.mean(generated * cond * norm_scale, axis=(1, 2)).squeeze())
     amean_real.append(np.mean(real * cond * norm_scale, axis=(1, 2)).squeeze())
-
+    dists_real.append(real * cond * norm_scale)
+    dists_gen.append(generated * cond * norm_scale)
 
 
 amean_fraction_gen = np.array(amean_fraction_gen)
 amean_fraction_real = np.array(amean_fraction_real)
 amean_gen = np.array(amean_gen)
 amean_real = np.array(amean_real)
+dists_gen = np.array(dists_gen)
+dists_real = np.array(dists_real)
+
+
+def ecdf(data):
+    x = np.sort(data)
+    n = x.size
+    y = np.arange(1, n+1) / n
+    return(x, y)
+
+
+sns.set_palette('colorblind')
+# ecdf of area means. the hours are flattened
+plt.figure()
+ax1 = plt.subplot(211)
+plt.plot(*ecdf(amean_gen.flatten()), label='gen')
+plt.plot(*ecdf(amean_real.flatten()), label='real')
+plt.legend(loc='upper left')
+sns.despine()
+plt.xlabel('mm/h')
+plt.ylabel('ecdf areamean')
+plt.semilogx()
+# ecdf of (flattened) spatial data
+ax2 = plt.subplot(212)
+plt.plot(*ecdf(dists_gen.flatten()), label='gen')
+plt.plot(*ecdf(dists_real.flatten()), label='real')
+plt.legend(loc='upper left')
+sns.despine()
+plt.ylabel('ecdf')
+plt.xlabel('mm/h')
+plt.semilogx()
+plt.tight_layout()
+plt.savefig(f'{plotdir}/ecdf_allx_{params}_{epoch:04d}.png', dpi=400)
+# cut at 0.1mm/h
+ax1.set_xlim(xmin=0.5)
+ax1.set_ylim(ymin=0.8, ymax=1.01)
+ax2.set_xlim(xmin=0.1)
+ax2.set_ylim(ymin=0.6, ymax=1.01)
+plt.savefig(f'{plotdir}/ecdf_{params}_{epoch:04d}.png', dpi=400)
 
 # convert to pandas data frame, with timeofday ('hour') as additional column
 res_df = []
@@ -346,6 +392,7 @@ for i in range(24):
 
 df = pd.concat(res_df)
 df.to_csv(f'{plotdir}/gen_and_real_ameans_{params}_{epoch:04d}.csv')
+
 # make boxplot
 for showfliers in (True, False):
 
@@ -368,7 +415,7 @@ for showfliers in (True, False):
 # and additionally 10 fake ones that use the same noise for all plots
 # the latter we plot in the same color (1 seperate color for each generated one)
 # so that we can compare them accross the plots
-sns.set_palette('colorblind')
+
 n_to_generate = 20
 n_fake_per_real = 100
 n_fake_per_real_samenoise = 10
