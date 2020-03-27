@@ -2,6 +2,7 @@
 #SBATCH -A SNIC2019-3-611
 #SBATCH --time=06:00:00
 #SBATCH -N 1
+#SBATCH --exclusive
 """
 this script uses the trained generator to create precipitation scenarios.
 a number of daily sum conditions are sampled from the test-data,
@@ -58,10 +59,8 @@ plot_format = 'png'
 name = 'wgancp_pixelnorm'
 
 # input and output directories. different for different machines
-if 'SNIC_RESOURCE' in os.environ.keys() and os.environ['SNIC_RESOURCE'] == 'kebnekaise':
-    machine = 'kebnekaise'
-else:
-    machine = 'colab'
+machine = 'kebnekaise'
+
 
 plotdirs = {'kebnekaise': f'plots_generated_{name}/',
             'misu160': f'plots_generated_{name}/',
@@ -373,6 +372,11 @@ ax1.set_ylim(ymin=0.8, ymax=1.01)
 ax2.set_xlim(xmin=0.1)
 ax2.set_ylim(ymin=0.6, ymax=1.01)
 plt.savefig(f'{plotdir}/ecdf_{params}_{epoch:04d}.png', dpi=400)
+
+plt.close('all')
+# free some memory
+del dists_gen
+del dists_real
 
 # convert to pandas data frame, with timeofday ('hour') as additional column
 res_df = []
