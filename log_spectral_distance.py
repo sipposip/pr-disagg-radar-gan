@@ -76,8 +76,8 @@ def log_spectral_distance(ps1, ps2):
 generated = np.load('/climstorage/sebastian/pr_disagg/data/generated_samples.npy')
 real = np.load('/climstorage/sebastian/pr_disagg/data/real_samples.npy')
 
-# hack
-n_samples = 500
+
+n_samples = 200
 generated = generated[:n_samples]
 real = real[:n_samples]
 
@@ -136,10 +136,13 @@ pickle.dump(res,open('log_spectral_distances.pkl','wb'))
 # spectral distances.
 # how should we deal with them??
 
+sns.set_palette('colorblind')
+
 plt.figure()
 sns.kdeplot(dists_real, label='obs')
 sns.kdeplot(dists_gen, label='generated')
 sns.kdeplot(dists_between_gen_and_real, label='between obs and generated')
+plt.xlabel('log spectral distance')
 plt.legend()
 sns.despine()
 plt.savefig(f'plots/log_spectral_distances_n{n_samples}.svg')

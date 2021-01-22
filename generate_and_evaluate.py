@@ -311,6 +311,7 @@ amean_real = []
 dists_real = []
 dists_gen = []
 
+
 # for each real conditoin, we crate 1 fake sample
 for i in trange(n_sample):
     real, cond = generate_real_samples_and_conditions(1)
@@ -329,13 +330,16 @@ for i in trange(n_sample):
     dists_gen.append(generated * cond * norm_scale)
 
 
+
+
 amean_fraction_gen = np.array(amean_fraction_gen)
 amean_fraction_real = np.array(amean_fraction_real)
 amean_gen = np.array(amean_gen)
 amean_real = np.array(amean_real)
 dists_gen = np.array(dists_gen)
 dists_real = np.array(dists_real)
-
+np.save('data/generated_samples.npy',dists_gen)
+np.save('data/real_samples.npy', dists_real)
 
 def ecdf(data):
     x = np.sort(data)
