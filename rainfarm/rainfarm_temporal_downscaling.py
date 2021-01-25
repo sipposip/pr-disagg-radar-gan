@@ -114,7 +114,7 @@ def downscale_spatiotemporal(precip, alpha, beta, ds_t_factor):
     fg[0] = 0
     fg[:, 0, 0] = 0
     assert (np.all(np.isfinite(fg)))
-    g = np.fft.ifft2(fg).real
+    g = np.fft.ifftn(fg, axes=(0,1,2)).real
     g /= g.std()
     r = np.exp(g)
     # normalize the field on a point by point bases so that it has the same properties

@@ -1,4 +1,6 @@
 
+import matplotlib
+matplotlib.use('agg')
 import pickle
 import os
 from tqdm import tqdm
