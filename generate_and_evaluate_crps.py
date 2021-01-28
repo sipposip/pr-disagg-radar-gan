@@ -2,7 +2,7 @@
 #SBATCH -A SNIC2020-5-628
 #SBATCH --time=03:00:00
 #SBATCH -N 1
-#SBATCH --exclusive
+#SBATCH --gres=gpu:k80:1
 """
 this script uses the trained generator to create precipitation scenarios.
 a number of daily sum conditions are sampled from the test-data,
@@ -204,11 +204,14 @@ n_sample = 1000
 n_fake_per_real = 1000
 
 
-# simple baseline: select 1000 samples as "forecast".
-#todo: it would be better to take them from the training sample!
-# or even better: exactly the same trining sample as used for the rainfarm stuff
-baseline_random,_ = generate_real_samples_and_conditions(1000)
-baseline_random = np.squeeze(baseline_random)
+
+baseline = np.load('rainfarm_calibration_data.npy')
+dsum = np.sum(baseline, axis=1)  # daily sum
+# the data now is in mm/hour, but we want it as fractions of the daily sum for each day
+for i in range(len(baseline)):
+    baseline[i] = baseline[i] / dsum[i]
+
+
 # for each real conditoin, we crate fake_per_sample scenarios
 crps_amean_all = []
 crps_baseline_amean_all = []
@@ -229,8 +232,8 @@ for i in trange(n_sample):
     crps_amean_all.append(crps_areamean)
 
 
-    baseline = baseline_random * cond * norm_scale
-    crps_baseline = properscoring.crps_ensemble(real, baseline, axis=0)
+    baseline_scaled = baseline * cond * norm_scale
+    crps_baseline = properscoring.crps_ensemble(real, baseline_scaled, axis=0)
     crps_baseline_amean = np.mean(crps_baseline, axis=(1,2))
     crps_baseline_amean_all.append(crps_baseline_amean)
 
