@@ -14,6 +14,10 @@ from skimage.util import view_as_windows
 from rainfarm.rainfarm_temporal_downscaling import estimate_alpha ,estimate_beta, downscale_spatiotemporal
 
 
+# for reproducability, we set a fixed seed to the random number generator
+np.random.seed(334)
+
+
 startdate = '20090101'
 enddate = '20161231'
 
@@ -89,7 +93,6 @@ for i_repeat in range(n_repeat):
     betas.append(beta)
     print(alpha,beta)
 
-# tests
-dsum = batch[0].sum(0)
+    if i_repeat==0:
+        np.save('rainfarm_calibration_data.npy', batch)
 
-generated = downscale_spatiotemporal(dsum, alpha, beta, 24)

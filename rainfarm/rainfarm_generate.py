@@ -22,6 +22,8 @@ alpha, beta = pickle.load(open('data/spectral_slopes.pkl','rb'))
 # for a start: generate one artificial for each real one
 generated = np.array([downscale_spatiotemporal(p,alpha,beta,24) for p in tqdm(reals_dsum)])
 
+np.save('/climstorage/sebastian/pr_disagg/data/generated_samples_rainfarm.npy',generated)
+
 amean_gen = np.mean(generated, axis=(1,2))
 amean_real = np.mean(reals, axis=(1,2))
 
