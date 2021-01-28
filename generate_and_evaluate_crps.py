@@ -2,29 +2,22 @@
 #SBATCH -A SNIC2020-5-628
 #SBATCH --time=03:00:00
 #SBATCH -N 1
-#SBATCH --gres=gpu:k80:1
+#SBATCH --gres=gpu:v100:1
 """
-this script uses the trained generator to create precipitation scenarios.
-a number of daily sum conditions are sampled from the test-data,
-and for each sub-daily scenarios are generated with the generator.
-The results are shown in various plots
+
+input files from other scripts:
+
+rainfarm_calibration_data.npy
+real_samples.py
+
 """
 
 import pickle
 import os
 import numpy as np
 import tensorflow as tf
-import pandas as pd
-import matplotlib
-import matplotlib.colors as mcolors
-matplotlib.use('agg')
-from pylab import plt
-import seaborn as sns
-import scipy.stats
 import properscoring
 from tqdm import trange
-from skimage.util import view_as_windows
-from matplotlib.colors import LogNorm
 from tensorflow.keras import backend as K
 
 # for reproducability, we set a fixed seed to the random number generator
@@ -61,7 +54,6 @@ name = 'wgancp_pixelnorm'
 
 # input and output directories. different for different machines
 machine = 'kebnekaise'
-
 
 plotdirs = {'kebnekaise': f'plots_generated_{name}/',
             'misu160': f'plots_generated_{name}/',
@@ -124,6 +116,7 @@ print(f'evaluate in {n_samples} samples')
 print('load the trained generator')
 generator_file = f'{outdir}/gen_{params}_{epoch:04d}.h5'
 
+
 # we need the custom layer PixelNormalization to load the generator
 class PixelNormalization(tf.keras.layers.Layer):
     # initialize the layer
@@ -159,43 +152,8 @@ def wasserstein_loss(y_true, y_pred):
     # we use -1 for fake, and +1 for real labels
     return tf.reduce_mean(y_true * y_pred)
 
+
 gen.compile(loss=wasserstein_loss, optimizer=tf.keras.optimizers.RMSprop(lr=0.00005))
-
-
-def generate_real_samples_and_conditions(n_batch):
-    """get random sampples and do the last preprocessing on them"""
-    # get random sample of indices from the precomputed indices
-    # for this we generate random indices for the index list (confusing termoonology, since we use
-    # indices to index the list of indices...
-    ixs = np.random.randint(n_samples, size=n_batch)
-    idcs_batch = indices_all[ixs]
-
-    # now we select the data corresponding to these indices
-    data_wview = view_as_windows(data, (1, 1, ndomain, ndomain))[..., 0, 0, :, :]
-    batch = data_wview[idcs_batch[:, 0], :, idcs_batch[:, 1], idcs_batch[:, 2]]
-    # add empty channel dimension (necessary for keras, which expects a channel dimension)
-    batch = np.expand_dims(batch, -1)
-    # compute daily sum (which is the condition)
-    batch_cond = np.sum(batch, axis=1)  # daily sum
-
-    # the data now is in mm/hour, but we want it as fractions of the daily sum for each day
-    for i in range(n_batch):
-        batch[i] = batch[i] / batch_cond[i]
-
-    # normalize daily sum
-    batch_cond = batch_cond / norm_scale
-    assert (batch.shape == (n_batch, nhours, ndomain, ndomain, 1))
-    assert (batch_cond.shape == (n_batch, ndomain, ndomain, 1))
-    assert (~np.any(np.isnan(batch)))
-    assert (~np.any(np.isnan(batch_cond)))
-    assert (np.max(batch) <= 1)
-    assert (np.min(batch) >= 0)
-
-    return [batch, batch_cond]
-
-
-plt.rcParams['savefig.bbox'] = 'tight'
-
 
 # compute statistics over
 # many generated smaples
@@ -203,38 +161,37 @@ plt.rcParams['savefig.bbox'] = 'tight'
 n_sample = 1000
 n_fake_per_real = 1000
 
-
-
 baseline = np.load('rainfarm_calibration_data.npy')
-dsum = np.sum(baseline, axis=1)  # daily sum
-# the data now is in mm/hour, but we want it as fractions of the daily sum for each day
-for i in range(len(baseline)):
-    baseline[i] = baseline[i] / dsum[i]
+baseline_dsum = np.sum(baseline, axis=1)  # daily sum
 
+# load the test samples from the main generate_and_evaluate.py script
+reals_precip = np.load('/home/s/sebsc/pfs/pr_disagg/smhi_radar/data/real_samples.npy')
+reals_dsum = np.sum(reals_precip, axis=1)
+reals_fraction = np.copy(reals_precip)
+for i in range(len(reals_fraction)):
+    reals_fraction[i] = reals_fraction[i] / reals_dsum[i]
 
-# for each real conditoin, we crate fake_per_sample scenarios
+# for each real condition, we crate fake_per_sample scenarios
 crps_amean_all = []
 crps_baseline_amean_all = []
 for i in trange(n_sample):
-    real, cond = generate_real_samples_and_conditions(1)
+    real_fraction = reals_fraction[i]
+    real_precip = reals_precip[i]
+    cond = reals_dsum[i] / norm_scale
+    # add empty dimensions
+    cond = cond[None, ..., None]
     cond_batch = np.repeat(cond, repeats=n_fake_per_real, axis=0)
     latent = np.random.normal(size=(n_fake_per_real, latent_dim))
     generated = gen.predict([latent, cond_batch])
-
     generated = generated.squeeze()
-    real = real.squeeze()
     cond = cond.squeeze()
-    real = (real * cond * norm_scale)
     generated = (generated * cond * norm_scale)
-    crps = properscoring.crps_ensemble(real, generated, axis=0)
+    crps = properscoring.crps_ensemble(real_precip, generated, axis=0)
     # compute areamean crps
-    crps_areamean = np.mean(crps,axis=(1,2))
+    crps_areamean = np.mean(crps, axis=(1, 2))
     crps_amean_all.append(crps_areamean)
-
-
-    baseline_scaled = baseline * cond * norm_scale
-    crps_baseline = properscoring.crps_ensemble(real, baseline_scaled, axis=0)
-    crps_baseline_amean = np.mean(crps_baseline, axis=(1,2))
+    crps_baseline = properscoring.crps_ensemble(real_precip, baseline, axis=0)
+    crps_baseline_amean = np.mean(crps_baseline, axis=(1, 2))
     crps_baseline_amean_all.append(crps_baseline_amean)
 
 crps_amean_all = np.array(crps_amean_all)
@@ -245,6 +202,4 @@ crps_per_hour = np.mean(crps_amean_all, axis=0)
 crps_baseline_totalmean = np.mean(crps_baseline_amean_all)
 crps_baseline_per_hour = np.mean(crps_baseline_amean_all, axis=0)
 
-pickle.dump((crps_amean_all, crps_baseline_amean_all), open('data/crps_results.pkl','wb'))
-
-
+pickle.dump((crps_amean_all, crps_baseline_amean_all), open(f'data/crps_results_n_sample{n_sample}.pkl', 'wb'))
