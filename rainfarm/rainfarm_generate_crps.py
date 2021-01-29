@@ -20,7 +20,7 @@ alpha, beta = pickle.load(open('data/spectral_slopes.pkl','rb'))
 # compute statistics over
 # many generated smaples
 # we compute the areamean,
-n_sample = 1000
+n_sample = 10000
 n_fake_per_real = 1000
 
 crps_amean_all_rainfarm = []
@@ -30,7 +30,7 @@ for i in trange(n_sample):
 
     generated = np.array([downscale_spatiotemporal(dsum, alpha, beta, 24) for p in range(n_fake_per_real)])
     crps = properscoring.crps_ensemble(real, generated, axis=0)
-    crps_amean_all_rainfarm.append(crps)
+    crps_amean_all_rainfarm.append(crps.mean(axis=(1, 2)))
 
 crps_amean_all_rainfarm = np.array(crps_amean_all_rainfarm)
 pickle.dump((crps_amean_all_rainfarm), open('data/crps_results_rainfarm.pkl','wb'))

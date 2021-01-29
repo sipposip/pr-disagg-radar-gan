@@ -1,6 +1,6 @@
 #! /pfs/nobackup/home/s/sebsc/miniconda3/envs/pr-disagg-env/bin/python
 #SBATCH -A SNIC2020-5-628
-#SBATCH --time=03:00:00
+#SBATCH --time=2-00:00:00
 #SBATCH -N 1
 #SBATCH --gres=gpu:v100:1
 """
@@ -158,7 +158,7 @@ gen.compile(loss=wasserstein_loss, optimizer=tf.keras.optimizers.RMSprop(lr=0.00
 # compute statistics over
 # many generated smaples
 # we compute the areamean,
-n_sample = 1000
+n_sample = 10000
 n_fake_per_real = 1000
 
 baseline = np.load('rainfarm_calibration_data.npy')

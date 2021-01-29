@@ -1,5 +1,5 @@
 #! /pfs/nobackup/home/s/sebsc/miniconda3/envs/pr-disagg-env/bin/python
-#SBATCH -A SNIC2019-3-611
+#SBATCH -A SNIC2020-5-628
 #SBATCH --time=06:00:00
 #SBATCH -N 1
 #SBATCH --exclusive
@@ -37,19 +37,18 @@ eval_startdate = '20170101'
 eval_enddate = '20181231'
 
 # parameters (need to be the same as in training)
-ndomain = 16  # gridpoints
+ndomain = 64  # gridpoints
 stride = 16
 tres = 1
 latent_dim = 100
 
 tp_thresh_daily = 5  # mm. in the radardate the unit is mm/h, but then on 5 minutes steps.
 # the conversion is done automatically in this script
-n_thresh = 20
+n_thresh = 40
 
 # here we need to choose which epoch we use from the saved models (we saved them at the end of every
-# epoch). visual inspection of the images generated from the training set showed
-# that after epoch 20, things starts to detoriate. Therefore we use epoch 20.
-epoch = 20
+# epoch)
+epoch = 8
 # normalization of daily sums
 # we ues the 99.9 percentile of 2010
 norm_scale = 127.4
@@ -62,9 +61,9 @@ name = 'wgancp_pixelnorm'
 machine = 'kebnekaise'
 
 
-plotdirs = {'kebnekaise': f'plots_generated_{name}_rev1/',
-            'misu160': f'plots_generated_{name}_rev1/',
-            'colab': f'/content/drive/My Drive/data/smhi_radar/plots_generated_{name}_rev1/'}
+plotdirs = {'kebnekaise': f'plots_generated_{name}_largedomain/',
+            'misu160': f'plots_generated_{name}_largedomain/',
+            'colab': f'/content/drive/My Drive/data/smhi_radar/plots_generated_{name}_largedomain/'}
 plotdir = plotdirs[machine]
 
 outdirs = {'kebnekaise': f'/pfs/nobackup/home/s/sebsc/pr_disagg/trained_models/{name}/',
@@ -203,7 +202,7 @@ plotnorm = LogNorm(vmin=0.01, vmax=50)
 n_to_generate = 20
 n_per_batch = 10
 n_batches = n_to_generate // n_per_batch
-n_fake_per_real = 10
+n_fake_per_real = 15
 plotcount = 0
 for ibatch in trange(n_batches):
 
@@ -217,7 +216,6 @@ for ibatch in trange(n_batches):
         # we batch all n_fake_per_real together
         cond_batch = np.repeat(cond[np.newaxis], repeats=n_fake_per_real, axis=0)
         generated = gen.predict([latent, cond_batch])
-
 
         # make a matrix of mapplots.
         # first column: condition (daily mean), the same for every row
@@ -421,8 +419,8 @@ amean_gen = np.array(amean_gen)
 amean_real = np.array(amean_real)
 dists_gen = np.array(dists_gen)
 dists_real = np.array(dists_real)
-np.save('data/generated_samples.npy',dists_gen)
-np.save('data/real_samples.npy', dists_real)
+np.save('data/generated_samples_largedomain.npy',dists_gen)
+np.save('data/real_samples_largedomain.npy', dists_real)
 
 def ecdf(data):
     x = np.sort(data)
@@ -442,23 +440,24 @@ sns.despine()
 plt.xlabel('mm/h')
 plt.ylabel('ecdf areamean')
 plt.semilogx()
-# ecdf of (flattened) spatial data
-ax2 = plt.subplot(212)
-plt.plot(*ecdf(dists_gen.flatten()), label='gen')
-plt.plot(*ecdf(dists_real.flatten()), label='real')
-plt.legend(loc='upper left')
-sns.despine()
-plt.ylabel('ecdf')
-plt.xlabel('mm/h')
-plt.semilogx()
-plt.tight_layout()
-plt.savefig(f'{plotdir}/ecdf_allx_{params}_{epoch:04d}.png', dpi=400)
-# cut at 0.1mm/h
-ax1.set_xlim(xmin=0.5)
-ax1.set_ylim(ymin=0.8, ymax=1.01)
-ax2.set_xlim(xmin=0.1)
-ax2.set_ylim(ymin=0.6, ymax=1.01)
-plt.savefig(f'{plotdir}/ecdf_{params}_{epoch:04d}.png', dpi=400)
+## commented out because of memory problems
+# # ecdf of (flattened) spatial data
+# ax2 = plt.subplot(212)
+# plt.plot(*ecdf(dists_gen.flatten()), label='gen')
+# plt.plot(*ecdf(dists_real.flatten()), label='real')
+# plt.legend(loc='upper left')
+# sns.despine()
+# plt.ylabel('ecdf')
+# plt.xlabel('mm/h')
+# plt.semilogx()
+# plt.tight_layout()
+# plt.savefig(f'{plotdir}/ecdf_allx_{params}_{epoch:04d}.png', dpi=400)
+# # cut at 0.1mm/h
+# ax1.set_xlim(xmin=0.5)
+# ax1.set_ylim(ymin=0.8, ymax=1.01)
+# ax2.set_xlim(xmin=0.1)
+# ax2.set_ylim(ymin=0.6, ymax=1.01)
+# plt.savefig(f'{plotdir}/ecdf_{params}_{epoch:04d}.png', dpi=400)
 
 plt.close('all')
 # free some memory

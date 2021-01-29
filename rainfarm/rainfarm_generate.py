@@ -71,12 +71,15 @@ cmap = plt.cm.gist_earth_r
 plotnorm = LogNorm(vmin=0.01, vmax=50)
 
 n_to_generate = 20
-n_fake_per_real = 15
+n_fake_per_real = 10
 n_plot = n_fake_per_real + 1
 plotcount=0
 for i in range(n_to_generate):
-    real, dsum = reals[i],reals_dsum[i]
     plotcount += 1
+    real = np.load(f'data/real_precip_for_mapplots_{plotcount}.npy')
+    real = np.squeeze(real)
+    dsum = np.sum(real, axis=0)
+
 
     generated = np.array([downscale_spatiotemporal(dsum,alpha,beta,24) for _ in range(n_fake_per_real)])
 
@@ -111,6 +114,40 @@ for i in range(n_to_generate):
         for jplot in range(1, 24 + 1):
             plt.subplot(n_plot, 25, (iplot + 1) * 25 + jplot + 1)
             plt.imshow(generated_scaled[iplot, jplot - 1, :, :].squeeze(), cmap=cmap, norm=plotnorm)
+            plt.axis('off')
+    fig.subplots_adjust(right=0.93)
+    cbar_ax = fig.add_axes([0.93, 0.15, 0.007, 0.7])
+    cbar = fig.colorbar(im, cax=cbar_ax)
+    cbar.set_label('precipitation [mm]', fontsize=16)
+    cbar.ax.tick_params(labelsize=16)
+    plt.savefig(f'{plotdir}/generated_precip_rainfarm_{plotcount:04d}_allhours.png')
+
+    # only every 3rd hour
+    fig = plt.figure(figsize=(12, 12))
+    n_plot = n_fake_per_real + 1
+    ax = plt.subplot(n_plot, 9, 1)
+    plt.imshow(dsum, cmap=cmap, norm=plotnorm)
+    plt.axis('off')
+    ax.annotate('real', xy=(0, 0.5), xytext=(-5, 0), xycoords='axes fraction', textcoords='offset points',
+                size='large', ha='right', va='center', rotation='vertical')
+    ax.annotate(f'daily sum', xy=(0.5, 1), xytext=(0, 5), xycoords='axes fraction', textcoords='offset points',
+                size='large', ha='center', va='baseline')
+    for jplot in range(1, 8 + 1):
+        ax = plt.subplot(n_plot, 9, jplot + 1)
+        plt.imshow(real_scaled[jplot * 3 - 1, :, :].squeeze(), cmap=cmap, norm=plotnorm)
+        plt.axis('off')
+        hour = (jplot - 1) * 3 + 1
+        ax.annotate(f'{hour:02d}'':00', xy=(0.5, 1), xytext=(0, 5),
+                    xycoords='axes fraction', textcoords='offset points',
+                    size='large', ha='center', va='baseline')
+    # plot fake samples
+    for iplot in range(n_fake_per_real):
+        plt.subplot(n_plot, 8 + 1, (iplot + 1) * 9 + 1)
+        plt.imshow(dsum, cmap=cmap, norm=plotnorm)
+        plt.axis('off')
+        for jplot in range(1, 8 + 1):
+            plt.subplot(n_plot, 9, (iplot + 1) * 9 + jplot + 1)
+            im = plt.imshow(generated_scaled[iplot, jplot * 3 - 1, :, :].squeeze(), cmap=cmap, norm=plotnorm)
             plt.axis('off')
     fig.subplots_adjust(right=0.93)
     cbar_ax = fig.add_axes([0.93, 0.15, 0.007, 0.7])
