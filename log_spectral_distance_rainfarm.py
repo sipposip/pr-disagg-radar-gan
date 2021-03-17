@@ -76,7 +76,7 @@ def log_spectral_distance(ps1, ps2):
 generated_rainfarm = np.load('/climstorage/sebastian/pr_disagg/data/generated_samples_rainfarm.npy')
 
 
-n_samples = 200
+n_samples = 500
 generated = generated_rainfarm[:n_samples]
 
 

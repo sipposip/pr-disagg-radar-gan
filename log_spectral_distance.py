@@ -78,7 +78,7 @@ real = np.load('/climstorage/sebastian/pr_disagg/data/real_samples.npy')
 generated_rainfarm = np.load('/climstorage/sebastian/pr_disagg/data/generated_samples_rainfarm.npy')
 
 
-n_samples = 200
+n_samples = 1000
 generated = generated[:n_samples]
 real = real[:n_samples]
 generated_rainfarm = generated_rainfarm[:n_samples]

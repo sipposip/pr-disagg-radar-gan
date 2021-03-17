@@ -59,15 +59,17 @@ plot_format = 'png'
 name = 'wgancp_pixelnorm'
 
 # input and output directories. different for different machines
-machine = 'kebnekaise'
+machine = 'tiberino'
 
 
 plotdirs = {'kebnekaise': f'plots_generated_{name}_rev1/',
+            'tiberino': f'plots_generated_{name}_rev1/',
             'misu160': f'plots_generated_{name}_rev1/',
             'colab': f'/content/drive/My Drive/data/smhi_radar/plots_generated_{name}_rev1/'}
 plotdir = plotdirs[machine]
 
 outdirs = {'kebnekaise': f'/pfs/nobackup/home/s/sebsc/pr_disagg/trained_models/{name}/',
+           'tiberino': f'/data/fyris/sebastian/pr_disagg/from_keb/pr_disagg/trained_models/{name}/',
            'misu160': f'/climstorage/sebastian/pr_disagg/smhi/rained_models/{name}/',
            'colab': f'/content/drive/My Drive/data/smhi_radar/trained_models/{name}/'}
 outdir = outdirs[machine]
@@ -80,10 +82,12 @@ os.system(f'mkdir -p {outdir}')
 
 converted_data_paths = {'misu160': '/climstorage/sebastian/pr_disagg/smhi/preprocessed/',
                         'kebnekaise': '/home/s/sebsc/pfs/pr_disagg/smhi_radar/preprocessed',
+                        'tiberino': '/data/fyris/sebastian/pr_disagg/from_keb/pr_disagg/smhi_radar/preprocessed',
                         'colab': '/content/drive/My Drive/data/smhi_radar/preprocessed/'}
 converted_data_path = converted_data_paths[machine]
 indices_data_paths = {'misu160': 'data/',
                       'kebnekaise': 'data/',
+                      'tiberino': 'data/',
                       'colab': '/content/drive/My Drive/data/smhi_radar/preprocessed/'}
 indices_data_path = indices_data_paths[machine]
 
@@ -236,7 +240,7 @@ for ibatch in trange(n_batches):
                     size='large', ha='center', va='baseline')
         for jplot in range(1, 24 + 1):
             ax = plt.subplot(n_plot, 25, jplot + 1)
-            plt.imshow(real[jplot - 1, :, :].squeeze(), vmin=0, vmax=1, cmap=plt.cm.magma_r)
+            plt.imshow(real[jplot - 1, :, :].squeeze(), vmin=0, vmax=1, cmap=plt.cm.Greys)
             plt.axis('off')
             ax.annotate(f'{jplot:02d}'':00', xy=(0.5, 1), xytext=(0, 5),
                         xycoords='axes fraction', textcoords='offset points',
@@ -248,7 +252,7 @@ for ibatch in trange(n_batches):
             plt.axis('off')
             for jplot in range(1, 24 + 1):
                 plt.subplot(n_plot, 25, (iplot + 1) * 25 + jplot + 1)
-                im = plt.imshow(generated[iplot, jplot - 1, :, :].squeeze(), vmin=0, vmax=1, cmap=plt.cm.magma_r)
+                im = plt.imshow(generated[iplot, jplot - 1, :, :].squeeze(), vmin=0, vmax=1, cmap=plt.cm.Greys)
                 plt.axis('off')
         fig.subplots_adjust(right=0.93)
         cbar_ax = fig.add_axes([0.93, 0.15, 0.007, 0.7])
@@ -315,9 +319,9 @@ for ibatch in trange(n_batches):
                     size='large', ha='center', va='baseline')
         for jplot in range(1, 8 + 1):
             ax = plt.subplot(n_plot, 9, jplot + 1)
-            plt.imshow(real[jplot*3 - 1, :, :].squeeze(), vmin=0, vmax=1, cmap=plt.cm.magma_r)
+            plt.imshow(real[jplot*3 - 1, :, :].squeeze(), vmin=0, vmax=1, cmap=plt.cm.Greys)
             plt.axis('off')
-            hour = (jplot-1)*3+1
+            hour = jplot*3
             ax.annotate(f'{hour:02d}'':00', xy=(0.5, 1), xytext=(0, 5),
                         xycoords='axes fraction', textcoords='offset points',
                         size='large', ha='center', va='baseline')
@@ -328,7 +332,7 @@ for ibatch in trange(n_batches):
             plt.axis('off')
             for jplot in range(1, 8 + 1):
                 plt.subplot(n_plot, 9, (iplot + 1) * 9 + jplot + 1)
-                im = plt.imshow(generated[iplot, jplot*3 - 1, :, :].squeeze(), vmin=0, vmax=1, cmap=plt.cm.magma_r)
+                im = plt.imshow(generated[iplot, jplot*3 - 1, :, :].squeeze(), vmin=0, vmax=1, cmap=plt.cm.Greys)
                 plt.axis('off')
         fig.subplots_adjust(right=0.93)
         cbar_ax = fig.add_axes([0.93, 0.15, 0.007, 0.7])
@@ -360,7 +364,7 @@ for ibatch in trange(n_batches):
             ax = plt.subplot(n_plot, 9, jplot + 1)
             plt.imshow(real_scaled[jplot*3 - 1, :, :].squeeze(), cmap=cmap, norm=plotnorm)
             plt.axis('off')
-            hour = (jplot-1)*3+1
+            hour = jplot*3
             ax.annotate(f'{hour:02d}'':00', xy=(0.5, 1), xytext=(0, 5),
                         xycoords='axes fraction', textcoords='offset points',
                         size='large', ha='center', va='baseline')
