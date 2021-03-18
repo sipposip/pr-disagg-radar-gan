@@ -1,5 +1,5 @@
-
 import matplotlib
+
 matplotlib.use('agg')
 import pickle
 import os
@@ -11,29 +11,28 @@ import seaborn as sns
 
 from rainfarm.rainfarm_temporal_downscaling import downscale_spatiotemporal
 
-plotdir='plots_generated_rainfarm'
+plotdir = 'plots_generated_rainfarm'
 os.system(f'mkdir -p {plotdir}')
 
 reals = np.load('/climstorage/sebastian/pr_disagg/data/real_samples.npy')
-reals_dsum = np.sum(reals,axis=1)
+reals_dsum = np.sum(reals, axis=1)
 
-alpha, beta = pickle.load(open('data/spectral_slopes.pkl','rb'))
+alpha, beta = pickle.load(open('data/spectral_slopes.pkl', 'rb'))
 
 # for a start: generate one artificial for each real one
-generated = np.array([downscale_spatiotemporal(p,alpha,beta,24) for p in tqdm(reals_dsum)])
+generated = np.array([downscale_spatiotemporal(p, alpha, beta, 24) for p in tqdm(reals_dsum)])
 
-np.save('/climstorage/sebastian/pr_disagg/data/generated_samples_rainfarm.npy',generated)
+np.save('/climstorage/sebastian/pr_disagg/data/generated_samples_rainfarm.npy', generated)
 
-amean_gen = np.mean(generated, axis=(1,2))
-amean_real = np.mean(reals, axis=(1,2))
-
+amean_gen = np.mean(generated, axis=(1, 2))
+amean_real = np.mean(reals, axis=(1, 2))
 
 
 def ecdf(data):
     x = np.sort(data)
     n = x.size
-    y = np.arange(1, n+1) / n
-    return(x, y)
+    y = np.arange(1, n + 1) / n
+    return (x, y)
 
 
 sns.set_palette('colorblind')
@@ -65,7 +64,6 @@ ax2.set_xlim(xmin=0.1)
 ax2.set_ylim(ymin=0.6, ymax=1.01)
 plt.savefig(f'{plotdir}/ecdf_rainfarm.png', dpi=400)
 
-
 plt.rcParams['savefig.bbox'] = 'tight'
 cmap = plt.cm.gist_earth_r
 plotnorm = LogNorm(vmin=0.01, vmax=50)
@@ -73,15 +71,14 @@ plotnorm = LogNorm(vmin=0.01, vmax=50)
 n_to_generate = 20
 n_fake_per_real = 10
 n_plot = n_fake_per_real + 1
-plotcount=0
+plotcount = 0
 for i in range(n_to_generate):
     plotcount += 1
     real = np.load(f'data/real_precip_for_mapplots_{plotcount}.npy')
     real = np.squeeze(real)
     dsum = np.sum(real, axis=0)
 
-
-    generated = np.array([downscale_spatiotemporal(dsum,alpha,beta,24) for _ in range(n_fake_per_real)])
+    generated = np.array([downscale_spatiotemporal(dsum, alpha, beta, 24) for _ in range(n_fake_per_real)])
 
     # now the same, but showing absolute precipitation fields
     # compute absolute precipitation from fraction of daily sum.
@@ -136,7 +133,7 @@ for i in range(n_to_generate):
         ax = plt.subplot(n_plot, 9, jplot + 1)
         plt.imshow(real_scaled[jplot * 3 - 1, :, :].squeeze(), cmap=cmap, norm=plotnorm)
         plt.axis('off')
-        hour = (jplot - 1) * 3 + 1
+        hour = jplot * 3
         ax.annotate(f'{hour:02d}'':00', xy=(0.5, 1), xytext=(0, 5),
                     xycoords='axes fraction', textcoords='offset points',
                     size='large', ha='center', va='baseline')
@@ -157,4 +154,3 @@ for i in range(n_to_generate):
     plt.savefig(f'{plotdir}/generated_precip_rainfarm_{plotcount:04d}.png')
 
     plt.close('all')
-
