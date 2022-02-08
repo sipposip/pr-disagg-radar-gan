@@ -4,7 +4,7 @@ RainDisaggGAN is a method that uses Generative Adverserial Networks (GANs) for t
 generate possible hourly patterns of precipitation, given the daily sum. It is trained on hourly precipitation radar
 data from SMHI.
 
-The method is described in our paper (INSERT LINK) by Sebastian Scher and Stefanie Peßenteiner
+The method is described in our paper (https://hess.copernicus.org/articles/25/3207/2021/) by Sebastian Scher and Stefanie Peßenteiner
 
 
 This repository contains the trained network, an example script on how to use it for temporaral disaggregation,
