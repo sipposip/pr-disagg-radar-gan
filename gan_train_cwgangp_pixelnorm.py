@@ -282,7 +282,6 @@ def create_discriminator():
     in_combined = tf.keras.layers.Concatenate(axis=-1)([in_sample, cond_expanded])
     kernel_size = (3, 3, 3)
     main_net = tf.keras.Sequential([
-
         tf.keras.layers.Conv3D(64, kernel_size=kernel_size, strides=2, input_shape=(nhours, ndomain, ndomain, 2),
                                padding="valid"),  # 11x7x7x32
         tf.keras.layers.LeakyReLU(alpha=0.2),
@@ -310,37 +309,46 @@ def create_discriminator():
 
 
 def create_generator():
-
-    # for the moment, the flat approach is used
     init = tf.keras.initializers.RandomNormal(stddev=0.02)
     # define model
 
-    n_nodes = 256 * 2 * 2 * 3
-    in_latent = tf.keras.layers.Input(shape=(latent_dim,))
-    # the condition is a 2d array (ndomain x ndomain), we simply flatten it
-    in_cond = tf.keras.layers.Input(shape=(ndomain, ndomain, n_channel))
-    in_cond_flat = tf.keras.layers.Flatten()(in_cond)
-    in_combined = tf.keras.layers.Concatenate()([in_latent, in_cond_flat])
+    in_latent = tf.keras.layers.Input(shape=(1, None, None, 25)) # 100 latents if input is shape (1,2,2,25)
+    in_cond = tf.keras.layers.Input(shape=(None, None, n_channel)) # (16,16,1) for training
+     
+    downsample_net = tf.keras.Sequential([
+        tf.keras.layers.Conv2D(64, kernel_size=(2,2), strides=2, padding="same"),
+        tf.keras.layers.LeakyReLU(alpha=0.2), # (8,8,64)
+      
+        tf.keras.layers.Conv2D(128, kernel_size=(2,2), strides=2, padding="same"),
+        tf.keras.layers.LeakyReLU(alpha=0.2), # (4,4,128)
+      
+        tf.keras.layers.Conv2D(256, kernel_size=(2,2), strides=2, padding="same"),
+        tf.keras.layers.LeakyReLU(alpha=0.2), # (2,2,256)
+    ])
+    in_cond_ds = downsample_net(in_cond) # (2,2,256)
+    in_cond_ds = tf.expand_dims(in_cond_ds, axis=1) # (1,2,2,256)
+    in_combined = tf.keras.layers.Concatenate()([in_latent, in_cond_ds]) # (1,2,2,281)
 
     main_net = tf.keras.Sequential([
-        tf.keras.layers.Dense(n_nodes, kernel_initializer=init),
-        tf.keras.layers.LeakyReLU(alpha=0.2),
-        tf.keras.layers.Reshape((3, 2, 2, 256)),
-
+        tf.keras.layers.UpSampling3D(size=(3, 1, 1)),
+        tf.keras.layers.Conv3D(256, (3, 3, 3), padding='same', kernel_initializer=init),
+        PixelNormalization(),
+        tf.keras.layers.LeakyReLU(alpha=0.2), # (3,2,2,256) 
+      
         tf.keras.layers.UpSampling3D(size=(2, 2, 2)),
         tf.keras.layers.Conv3D(256, (3, 3, 3), padding='same', kernel_initializer=init),
         PixelNormalization(),
-        tf.keras.layers.LeakyReLU(alpha=0.2),
+        tf.keras.layers.LeakyReLU(alpha=0.2), # (6,4,4,256) 
 
-        tf.keras.layers.UpSampling3D(size=(2, 2, 2)),
+        tf.keras.layers.UpSampling3D(size=(2, 2, 2)), 
         tf.keras.layers.Conv3D(128, (3, 3, 3), padding='same', kernel_initializer=init),
         PixelNormalization(),
-        tf.keras.layers.LeakyReLU(alpha=0.2),
+        tf.keras.layers.LeakyReLU(alpha=0.2), # (12,8,8,128) 
 
         tf.keras.layers.UpSampling3D(size=(2, 2, 2)),
         tf.keras.layers.Conv3D(64, (3, 3, 3), padding='same', kernel_initializer=init),
         PixelNormalization(),
-        tf.keras.layers.LeakyReLU(alpha=0.2),
+        tf.keras.layers.LeakyReLU(alpha=0.2), # (24,16,16,64) 
         # output 24x16x16x1
         tf.keras.layers.Conv3D(1, (3, 3, 3), activation='linear', padding='same', kernel_initializer=init),
         # softmax per gridpoint, thus over nhours, which is axis 1 (Softmax also counts the batch axis)
@@ -348,7 +356,6 @@ def create_generator():
         # check for Nans (only for debugging)
         tf.keras.layers.Lambda(
             lambda x: tf.debugging.check_numerics(x, 'found nan in output of per_gridpoint_softmax')),
-
     ])
 
     out = main_net(in_combined)
